@@ -1,0 +1,9 @@
+pymysql 
+requests 
+cryptography 
+beautifulsoup4 
+packaging 
+lxml 
+tqdm 
+toml 
+tabulate

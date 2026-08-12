@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# Pipeline data (large, generated)
+data/
+projects/
+packages/
+*.pkl
+*.zip
+*.tar.gz
+
+# Logs
+*.log
+log.txt
+unpack_log.txt
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Docker
+mysql_data/
+
+# Env
+.env

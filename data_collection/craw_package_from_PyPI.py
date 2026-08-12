@@ -10,10 +10,6 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 
-proxies = {
-    'http': 'http://127.0.0.1:7890',
-    'https': 'http://127.0.0.1:7890',
-}
 
 # 配置日志
 log_file = 'log.txt'
@@ -69,7 +65,7 @@ def download(package_name, package_version_name, download_url):
         download_dir.mkdir(parents=True, exist_ok=True)
     try:
         logger.info("开始下载: " + full_file_name)
-        req = requests.get(download_url, timeout=600,proxies=proxies)
+        req = requests.get(download_url, timeout=600)
         with open(full_file_name, 'wb') as code:
             code.write(req.content)
         logger.info("下载成功: " + full_file_name)
@@ -82,7 +78,7 @@ def process_package(package_name, url_template):
     package_url = url_template % package_name
     logger.info(f"请求包页面: {package_url}")
     try:
-        r = requests.get(package_url, timeout=(5, 10), proxies=proxies)
+        r = requests.get(package_url, timeout=(5, 10))
         if r.status_code != 200:
             logger.warning(f"{package_name} 请求失败，休息1分钟")
             time.sleep(60)
