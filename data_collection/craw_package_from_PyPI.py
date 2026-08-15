@@ -9,9 +9,10 @@ from bs4 import BeautifulSoup
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
+from tqdm import tqdm
 
 
-# 配置日志
+# Configure logging
 log_file = 'log.txt'
 logging.basicConfig(
     filename=log_file,
@@ -22,13 +23,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
+# Also log to console so progress is visible
+_console = logging.StreamHandler()
+_console.setLevel(logging.WARNING)
+_console.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+logger.addHandler(_console)
+
 def read_file(path):
     try:
         file = open(path, "r")
         data = file.read().splitlines()
         return data
     except Exception as e:
-        logger.error(f"读取文件出错: {e}")
+        logger.error(f"Failed to read file: {e}")
 
 
 def write_to_file(file, context, write_type):
@@ -57,53 +64,62 @@ def download(package_name, package_version_name, download_url):
     full_file_name = str(project_dir / package_version_name)
 
     if Path(full_file_name).exists():
-        logger.info(full_file_name + ' 已存在，跳过下载')
+        logger.info(full_file_name + ' already exists, skipping')
         return True
 
     download_dir = Path(project_dir)
     if download_dir.exists() is False:
         download_dir.mkdir(parents=True, exist_ok=True)
     try:
-        logger.info("开始下载: " + full_file_name)
+        logger.info("Downloading: " + full_file_name)
         req = requests.get(download_url, timeout=600)
         with open(full_file_name, 'wb') as code:
             code.write(req.content)
-        logger.info("下载成功: " + full_file_name)
+        logger.info("Downloaded: " + full_file_name)
         return True
     except Exception as e:
-        logger.error(f"下载出错 [{package_name} {package_version_name}]: {e}")
+        logger.error(f"Download failed [{package_name} {package_version_name}]: {e}")
         return False
 
-def process_package(package_name, url_template):
+def process_package(package_name, url_template, pkg_bar=None):
     package_url = url_template % package_name
-    logger.info(f"请求包页面: {package_url}")
+    logger.info(f"Fetching package page: {package_url}")
     try:
         r = requests.get(package_url, timeout=(5, 10))
         if r.status_code != 200:
-            logger.warning(f"{package_name} 请求失败，休息1分钟")
+            logger.warning(f"{package_name} request failed, sleeping 1 min")
             time.sleep(60)
             return
 
         soup = BeautifulSoup(r.text, 'lxml')
         all_packages = soup.find_all('a')
 
+        # Filter to sdist archives only
+        sdist_packages = [
+            p for p in all_packages
+            if p.text.endswith('.tar.gz') or p.text.endswith('.zip')
+        ]
+
+        ver_bar = tqdm(total=len(sdist_packages), desc=f"  {package_name}", unit="ver", leave=False)
+
         download_tasks = []
-        with ThreadPoolExecutor(max_workers=8) as executor:  # 可以根据机器性能调节 max_workers
-            for package in all_packages:
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            for package in sdist_packages:
                 package_version_name = package.text
-                if package_version_name.endswith('.tar.gz') or package_version_name.endswith('.zip'):
-                    download_url = package.get('href')
-                    future = executor.submit(download_with_retry, package_name, package_version_name, download_url)
-                    download_tasks.append(future)
+                download_url = package.get('href')
+                future = executor.submit(download_with_retry, package_name, package_version_name, download_url)
+                download_tasks.append(future)
 
             for future in as_completed(download_tasks):
                 future.result()
+                ver_bar.update(1)
 
-        logger.info(f"{package_name} 所有版本下载完成，休息10秒")
+        ver_bar.close()
+        logger.info(f"{package_name} all versions downloaded, sleeping 10s")
         time.sleep(10)
 
     except Exception as e:
-        logger.error(f"{package_name} 请求异常: {e}")
+        logger.error(f"{package_name} request error: {e}")
         time.sleep(60)
 
 def download_with_retry(package_name, package_version_name, download_url, max_retries=3):
@@ -112,19 +128,21 @@ def download_with_retry(package_name, package_version_name, download_url, max_re
         if success:
             return True
         else:
-            logger.warning(f"{package_name} {package_version_name} 下载失败，第 {attempt} 次尝试")
+            logger.warning(f"{package_name} {package_version_name} download failed, attempt {attempt}")
             if attempt < max_retries:
                 time.sleep(60)
-    logger.error(f"{package_name} {package_version_name} 下载失败，已达最大重试次数")
+    logger.error(f"{package_name} {package_version_name} download failed, max retries reached")
     return False
 
 def craw_package():
     url_template = "https://pypi.org/simple/%s/"
     rank_list = read_file('./src/rank.txt')
 
-    for rank in rank_list:
+    pkg_bar = tqdm(rank_list, desc="Packages", unit="pkg")
+    for rank in pkg_bar:
         package_name = rank.split('@@')[1]
-        process_package(package_name, url_template)
+        pkg_bar.set_postfix_str(package_name)
+        process_package(package_name, url_template, pkg_bar)
 
 if __name__ == '__main__':
     current_folder = Path(__file__).resolve().parent

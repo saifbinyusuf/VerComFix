@@ -2,13 +2,13 @@ import os, ast
 from func_calls_visitor import get_func_calls
 from db import save_api_calls
 
-# 加载筛选目标
+# Load filter targets
 target_tpl_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data_collection', 'rank.txt')
 target_tpls = set()
 with open(target_tpl_file, 'r', encoding='utf-8') as f:
     for line in f:
         line = line.strip()
-        if line: target_tpls.add(line.split("@@")[1]) # 大小写敏感
+        if line: target_tpls.add(line.split("@@")[1]) # case sensitive
 
 class AssignVisitor(ast.NodeVisitor):
     def __init__(self):
@@ -99,7 +99,7 @@ def get_API_calls(code, file_path, package_version_dict):
                 full_name = name
                 prefix = name_parts[0].lower()
 
-            # 判断是否是指定 TPL 的方法
+            # Check if it is a method of the specified TPL
             lib_name = full_name.split('.')[0]
             if not lib_name in target_tpls: continue
 
@@ -119,7 +119,7 @@ def get_API_calls(code, file_path, package_version_dict):
     except (SyntaxError, ValueError):
         return []
 
-"""用于构建 function-level task: 从特定 function node 中提取 api"""
+"""Used to construct function-level task: extract API from specific function node"""
 def get_API_calls_from_funcnode(func_code, full_code, file_path, package_version_dict, class2obj=[], instance2class=[], id2fullname=[]):
     try:
         if full_code:
@@ -128,7 +128,7 @@ def get_API_calls_from_funcnode(func_code, full_code, file_path, package_version
                 for child in ast.iter_child_nodes(node):
                     child.parent = node
 
-            # 根据整个文件
+            # Based on the entire file
             visitor = AssignVisitor()
             visitor.visit(tree)
             class2obj = visitor.class_obj
@@ -137,7 +137,7 @@ def get_API_calls_from_funcnode(func_code, full_code, file_path, package_version
         else: # eval func-level
             pass
 
-        # 根据单个函数
+        # Based on a single function
         func_tree = tree = ast.parse(func_code, mode='exec')
         func_calls_raw = get_func_calls(func_code, func_tree)
         new_func_calls = []  
@@ -195,10 +195,10 @@ def get_API_calls_from_funcnode(func_code, full_code, file_path, package_version
 This is a get_all_call_apis docs.
  
 Parameters:
-  param1 - 代码源文件路径，是一个list
+  param1 - List of code source file paths
 
 Returns:
-    返回一个list，包含调用到的api，已经格式化了的
+    Returns a list containing the called APIs, already formatted
 
 """
 def get_all_call_apis_from_sources(sources, package_version_dict):

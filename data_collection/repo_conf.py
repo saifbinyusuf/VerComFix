@@ -7,7 +7,7 @@ from global_config import GITHUB_CODE_DOWNLOAD_BASE_DIR
 
 CONFIG_FILE = "conf.ini"
 
-# 从环境变量中读取 token
+# Read token from environment variable
 token = os.getenv('GITHUB_TOKEN')
 if token:
     print('[LOG] Successfully found <GITHUB_TOKEN>')
@@ -21,7 +21,7 @@ config = configparser.ConfigParser()
 try:
     # load file
     config.read(CONFIG_FILE, encoding='utf-8')
-    # transfor to dict
+    # transform to dict
     conf = {}
     for section in config.sections():
         conf[section] = dict(config.items(section))

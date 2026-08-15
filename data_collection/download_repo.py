@@ -7,20 +7,20 @@ from datetime import datetime
 
 from repo_conf import DOWN_CONF, HEADERS
 
-# ensure dir exits
+# ensure dir exists
 DUMP_BASE_DIR = DOWN_CONF['download_base_dir']
 try:
-    Path(DUMP_BASE_DIR).mkdir(parents=True, exist_ok=True)  # parents=True 创建父目录
+    Path(DUMP_BASE_DIR).mkdir(parents=True, exist_ok=True)  # parents=True creates parent directories
 except OSError as error:
     print(f"[Err] Fail to create directory: '{DUMP_BASE_DIR}', errMsg: {error}")
     exit(0)
 
 
-# 下载所有指定 repo（的特定 branch）
+# Download all specified repos (specific branch)
 def download_all(upstream: list) -> list:
-    download_links = [] # 用于手动下载
+    download_links = [] # for manual download fallback
 
-    # 获得 cufoff date（2025-06-01）前最后提交的 commit
+    # Get the latest commit SHA before cutoff date (2025-06-01)
     def _get_newest_commit_sha(repo_full_name: str, branch: str) -> str:
         try:
             response = requests.get(
@@ -28,7 +28,7 @@ def download_all(upstream: list) -> list:
                 params={
                     'sha': branch,
                     'until': '2025-05-31T23:59:59',
-                    'per_page': 1, 'page': 1  # 自动按照 newest 排序
+                    'per_page': 1, 'page': 1  # auto sorted by newest
                 },
                 headers=HEADERS
             )
@@ -49,7 +49,7 @@ def download_all(upstream: list) -> list:
                 return "", ""
         else:   return "", ""
     
-    # 下载指定的 repo，失败时返回 tuple
+    # Download a specific repo, returns tuple on failure
     def _download(commit_sha: str, repo_full_name: str, branch: str) -> None | tuple:
         link = f"https://github.com/{repo_full_name}/archive/{commit_sha}.zip"
         download_links.append(link)
@@ -96,7 +96,7 @@ def download_all(upstream: list) -> list:
 if __name__ == '__main__':
     print("[LOG] Start to download selected repos ...")
 
-    # 1 加载 (full_repo_name, branch)
+    # 1 Load (full_repo_name, branch)
     file_url = DOWN_CONF['upstream']
     try:
         with open(file_url, 'rb') as f:
@@ -108,10 +108,10 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"[Err] {e}")
   
-    # 2 下载所有 repo 的特定 commit 代码
+    # 2 Download all repos at specific commit
     _, download_links, repo_commit_info = download_all(selected_repos)
     
-    # 3 序列化 repo_commit_info.pkl
+    # 3 Serialize repo_commit_info.pkl
     try:
         with open('repo_commit_info.pkl', 'wb') as f:
             pickle.dump(repo_commit_info, f)

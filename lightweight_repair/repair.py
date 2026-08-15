@@ -49,7 +49,7 @@ if __name__ == '__main__':
         engine = CodeLLMCompletionEngine(model, tokenizer)
     print('[LOG] Model initialized')
 
-    # load tasks (api_level) => 从对应的 file
+    # load tasks (api_level) => from the corresponding file
     with open(f'./to_repair/{MODEL}.pkl', 'rb') as f:
         tasks = pickle.load(f)
         

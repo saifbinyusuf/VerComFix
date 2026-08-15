@@ -242,23 +242,23 @@ def make_API_full_name(meta_data, API_prefix):
     API_lst = []
     for k, v in meta_data.items():
         if k[0] == '_':
-            continue  # 忽略私有函数或类
+            continue  # skip private functions or classes
         if isinstance(v, tuple):
-            # v = (参数列表, 是否有返回值)
+            # v = (param list, has return value)
             API_name = "{}.{},{},{}".format(API_prefix, k, ";".join(v[0]), v[1])
             API_lst.append(API_name)
         elif isinstance(v, dict):
-            # 类的 __init__
+            # class __init__
             if '__init__' in v:
                 args = v['__init__']
                 API_name = "{}.{},{},{}".format(API_prefix, k, ";".join(args[0]), args[1])
                 API_lst.append(API_name)
             else:
-                args = ([], 0)  # 默认无参数无返回值
+                args = ([], 0)  # default: no params, no return
                 API_name = "{}.{},{},{}".format(API_prefix, k, ";".join(args[0]), args[1])
                 API_lst.append(API_name)
 
-            # 类中其他方法
+            # other class methods
             for f_name, args in v.items():
                 if f_name[0] != '_':
                     API_name = "{}.{}.{},{},{}".format(API_prefix, k, f_name, ";".join(args[0]), args[1])
@@ -284,14 +284,14 @@ def search_targets(root_dir, targets):
 
 def process_source_package(path, l_name):
     """
-    path: 解压后的源码目录
-    l_name: 库的顶层目录名，例如 numpy、torch
-    返回 entry_points：可能的入口模块路径
+    path: extracted source directory
+    l_name: top-level module name, e.g. numpy, torch
+    Returns entry_points: possible entry module paths
     """
     all_items = os.listdir(path)
     top_levels = []
 
-    # 尝试根据 l_name 或 setup.py 中的提示找到顶层目录
+    # Try to find top-level directory by l_name or setup.py hints
     for item in all_items:
         if item == l_name or item.startswith(l_name.replace("-", "_")):
             top_levels.append(item)
@@ -299,7 +299,7 @@ def process_source_package(path, l_name):
             top_levels.append(item)
 
     if not top_levels:
-        # fallback：使用所有目录
+        # fallback: use all directories
         top_levels = [item for item in all_items if os.path.isdir(os.path.join(path, item))]
 
     entry_points = search_targets(path, top_levels)
@@ -331,8 +331,8 @@ def normalize_name(name):
 
 def extract_version(folder_name, lib_name):
     """
-    从文件夹名如 pandas-0.13.1 中提取版本号（确保前缀匹配）。
-    返回版本字符串或 None。
+    Extract version string from folder name like pandas-0.13.1 (ensuring prefix match).
+    Returns version string or None.
     """
     lib_name_norm = normalize_name(lib_name)
     if normalize_name(folder_name).startswith(lib_name_norm + "-"):
@@ -348,7 +348,7 @@ def get_diff_from_all_version_apis(all_version_apis):
     first_version = version_keys[0]
 
     def to_hashable(api):
-        return (api[0], tuple(api[1]), api[2])  # 限定名, 参数, 返回标志
+        return (api[0], tuple(api[1]), api[2])  # qualified name, params, return flag
 
     base_apis = {to_hashable(api) for api in all_version_apis[first_version]}
     diff[first_version] = {api: '=' for api in base_apis}
@@ -358,9 +358,9 @@ def get_diff_from_all_version_apis(all_version_apis):
         result = {}
 
         for api in base_apis - current_apis:
-            result[api] = '-'  # 被删除
+            result[api] = '-'  # removed
         for api in current_apis - base_apis:
-            result[api] = '+'  # 新增
+            result[api] = '+'  # added
 
         diff[version] = result
         base_apis = current_apis
@@ -372,7 +372,7 @@ def save_package_version_apis_diff(package_name, all_diff):
         with conn.cursor() as cursor:
             version_id_counter = 0
             for version, apis in all_diff.items():
-                # 获取 top_level 记录
+                # Get top_level record
                 cursor.execute("""
                     SELECT id, version_id FROM top_level
                     WHERE package_name=%s AND package_version=%s
@@ -384,7 +384,7 @@ def save_package_version_apis_diff(package_name, all_diff):
                     continue
                 top_level_id, version_id = result
 
-                # 这里可选择是否更新 version_id（如果你想同步 version_id）
+                # Optionally update version_id (if you want to sync version_id)
                 cursor.execute("""
                     UPDATE top_level SET version_id=%s WHERE id=%s
                 """, (version_id_counter, top_level_id))
@@ -432,7 +432,7 @@ def main():
             if version:
                 version_dirs.append((version, os.path.join(lib_path, fname)))
 
-        # 按语义版本排序
+        # Sort by semantic version
         version_dirs.sort(key=lambda x: parse_version(x[0]))
 
         for version, v_dir in version_dirs:
@@ -464,7 +464,7 @@ def main():
             save_api_signatures(lib_name, version, version_api_list)
             print(f"Saved {len(version_api_list)} APIs for {lib_name}-{version} to database")
 
-        # 版本差异对比与存储
+        # Version diff comparison and storage
         if version_dirs:
             all_version_apis = {}
             for version, _ in version_dirs:

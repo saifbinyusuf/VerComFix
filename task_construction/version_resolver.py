@@ -8,7 +8,7 @@ COMMIT_DATE = None
 
 NAME_TO_INFO = None
 def get_commit_date(repo_name, commit_sha):
-    """获取 GitHub 仓库特定 commit 的提交日期"""
+    """Get commit date of a specific commit in a GitHub repo"""
 
     global NAME_TO_INFO
     if not NAME_TO_INFO:
@@ -39,13 +39,13 @@ def get_newest_tpl_version_before_date(package_name, cutoff_date):
     try:
         data = response.json()
     except Exception:
-        return None # 找不到 TPL
+        return None # TPL not found
     
     cutoff = datetime.strptime(cutoff_date, "%Y-%m-%d")
     versions = []
     
     for version, files in data["releases"].items():
-        if files:  # 忽略没有文件的版本
+        if files:  # skip versions with no files
             upload_time = datetime.strptime(files[0]["upload_time"], "%Y-%m-%dT%H:%M:%S")
             if upload_time <= cutoff:
                 versions.append((version, upload_time))
@@ -57,7 +57,7 @@ def parse_requirement_line(line: str):
     line = line.strip()
     if not line or line.startswith('#'):
         return None
-    # 通用正则匹配，支持 numpy==1.21.0、numpy>=1.20,<=1.22、numpy
+    # General regex matching, supports numpy==1.21.0, numpy>=1.20,<=1.22, numpy
     pattern = r'^\s*([a-zA-Z0-9_\-\.]+)\s*(.*)$'
     match = re.match(pattern, line)
     if not match:
@@ -66,7 +66,7 @@ def parse_requirement_line(line: str):
     version_spec = version_spec.strip()
     if version_spec.startswith(('==', '>=', '<=', '>', '<', '~=', '!=')):
         return (package, version_spec)
-    else: # 无版本说明
+    else: # no version specified
         pkg_version = get_newest_tpl_version_before_date(package, COMMIT_DATE)
         return (package, f'~~{pkg_version}') if pkg_version else (package, '')
 
@@ -74,16 +74,16 @@ def parse_pyproject_toml(filepath):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             text = f.read()
-        config = toml.loads(text) # 解析 TOML 格式字符串
+        config = toml.loads(text) # parse TOML format string
     except Exception as e:
         print(f"[Err] Fail to parse toml config: {e}")
         return []
 
     deps = set()
-    try: # 核心依赖
+    try: # core dependencies
         deps |= set(config["project"]["dependencies"])
     except KeyError: pass
-    try: # 可选依赖组
+    try: # optional dependency groups
         optional_deps = config["project"]["optional-dependencies"] # dict
         for optional_dep_group in optional_deps.values(): 
             deps |= set(optional_dep_group)
@@ -107,7 +107,7 @@ def parse_requirements_txt(filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
             for line in f:
                 line = _clean_req_line(line)
-                # 跳过空行、注释、替换索引操作
+                # Skip empty lines, comments, index substitutions
                 if not line or line[0] in _SKIP_LINE: continue
                 if line.startswith("pip install"):
                     for dep in line[12:].split(' '):
@@ -117,7 +117,7 @@ def parse_requirements_txt(filepath):
                     deps.append(parse_requirement_line(line[4:]))
                     continue
                 match = re.search(r"(.+?)=(.+?)=(.+)", line)
-                if match: # conda 格式的 requirement
+                if match: # conda-format requirement
                     deps.append(parse_requirement_line(match.group(1)))
                     continue
                 line = re.sub(r"\+.*$", "", line)  
@@ -173,7 +173,7 @@ def find_dependency_files(project_dir):
     setup_files = []
     requirements_files = []
     
-    # 只在顶层目录找
+    # Only look in top-level directory
     for name in os.listdir(project_dir):
         if name in ['setup.py', 'setup.cfg']:
             setup_files.append(os.path.join(project_dir, name))

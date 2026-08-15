@@ -13,8 +13,8 @@ CREATE_RANGE      = SPIDER_CONF['create_range']
 UPDATE_RANGE      = SPIDER_CONF['update_range']
 PAGE_SIZE         = SPIDER_CONF['page_size']
 MAX_RES           = SPIDER_CONF['max_res']
-DAY_GAP           = 90 # 10 days，初始间隔
-DEP_FILES = {          # 需要搜索的依赖文件
+DAY_GAP           = 90 # initial interval
+DEP_FILES = {          # dependency files to search for
     'requirements.txt',
     'pyproject.toml',
     'setup.py'
@@ -27,7 +27,7 @@ MIRROR = DEP_CONF['mirror']
 if MIRROR: print(f'[LOG] Using mirror: {MIRROR}')
 
 
-# 获取 CREATE_RANGE 内创建, 至少在 UPDATE_RANGE 内存在 commit, star>=50, fork>=10 的 repo
+# Get repos created within CREATE_RANGE, with commits within UPDATE_RANGE, star>=50, fork>=10
 def basic_filter(update_range: int) -> list:
     def _get_repo_list(bg_dt: datetime, time_gap: int, page: int=1, tot_page: int=0) -> list:
         """
@@ -35,7 +35,7 @@ def basic_filter(update_range: int) -> list:
         return: list<str> (repo Full Name)
         """
         def _get_full_name(repos: list) -> list:
-            """fork 状态符合配置（默认为 not fork），返回 full_name"""
+            """fork status matches config (default: not fork), return full_name"""
             return list(map(
                 lambda item: item['full_name'],
                 filter(lambda item: item['fork'] == IS_FORK, repos)
@@ -43,7 +43,7 @@ def basic_filter(update_range: int) -> list:
         def _format_time(dt: datetime) -> str:
             return min(dt, ED_DATE).strftime('%Y-%m-%d')
         
-        # time_range = xxxx-xx-xx..xxxx-xx-xx 闭区间
+        # time_range = xxxx-xx-xx..xxxx-xx-xx closed interval
         time_range = f"{_format_time(bg_dt)}..{_format_time(bg_dt+timedelta(time_gap))}"
         # send request
         response = requests.get(
@@ -69,7 +69,7 @@ def basic_filter(update_range: int) -> list:
                     print(f'「{time_range}」=> DEVIEDE {_format_time(bg_dt)}, {_format_time(bg_dt+timedelta(days=sub_gap))}')
                     return \
                         _get_repo_list(bg_dt, sub_gap) + \
-                        _get_repo_list(bg_dt+timedelta(days=sub_gap+1), time_gap-1-sub_gap) # DEBUG: 这里确有问题
+                        _get_repo_list(bg_dt+timedelta(days=sub_gap+1), time_gap-1-sub_gap) # DEBUG: there is indeed an issue here
             else:
                 if page==1:
                     tot_page = max(1, math.ceil(tot_items / PAGE_SIZE))
@@ -108,9 +108,9 @@ def basic_filter(update_range: int) -> list:
     return repos
 
 
-# 筛选具有 active fork 的 repo
+# Filter repos with active forks
 def active_fork_filter(upstream: list, fork_active_range: int) -> list:
-    # 判断 repo 在 FORK_UPDATE_RANGE 内是否存在 active fork
+    # Check if repo has an active fork within FORK_UPDATE_RANGE
     def _has_active_fork(repo_full_name: str) -> bool:
         cutoff_date = ED_DATE - timedelta(days=fork_active_range)
         try: 
@@ -143,12 +143,12 @@ def active_fork_filter(upstream: list, fork_active_range: int) -> list:
     return filtered
 
 
-# 筛选拥有依赖文件（DEP_FILES）的 repo
+# Filter repos that have dependency files (DEP_FILES)
 def dependency_file_filter(upstream: list) -> list:
     def _has_dependency_file(repo_full_name: str) -> bool | list:
         """
         param: <str> repo_full_name = '{author}/{repo}'
-        return: <bool> False (没找到), <str> file_download_url (根路径下的依赖文件名)
+        return: <bool> False (not found), <str> file_download_url (dependency file name in root path)
         """
         response = requests.get(
             url=f'https://api.github.com/repos/{repo_full_name}/contents', # default branch
@@ -181,9 +181,9 @@ def dependency_file_filter(upstream: list) -> list:
     print(f'[LOG] Got {len(filtered)} repo that has dependency file')
     return filtered
 
-# 筛选依赖数 >= MIN_NDEP(5) 的 repo
+# Filter repos with dependency count >= MIN_NDEP(5)
 def dependency_coverage_filter(upstream: list) -> list:
-    # 获取 branch
+    # Get branch
     def _get_branch(url: str) -> str:
         parts = url.split('/')
         if len(parts) >= 6:
@@ -191,14 +191,14 @@ def dependency_coverage_filter(upstream: list) -> list:
         else:
             print(f'[Err] Invalid GitHub raw URL format: {url}')
             return ""
-    # 暂时返回依赖数量: -1 表示 failed
+    # Return dependency count: -1 means failed
     def _cnt_dep(down_url: str) -> int:
-        # 获取扩展名
+        # Get file extension
         def _get_ext(url: str) -> str:
             match = re.search(r'\.([a-zA-Z0-9]+)(?:[\?#]|$)', url)
             return match.group(1).lower() if match else ""
         
-        # 下载 dependency file
+        # Download dependency file
         def _get_dep_file(down_url: str) -> str:
             """
             params:
@@ -206,7 +206,7 @@ def dependency_coverage_filter(upstream: list) -> list:
             return:
                 str: rtn "" when failed
             """
-            # 使用镜像
+            # Use mirror
             if MIRROR: down_url = down_url.replace("raw.githubusercontent.com", MIRROR) 
             try:
                 res = requests.get(url=down_url, headers=HEADERS)
@@ -221,16 +221,16 @@ def dependency_coverage_filter(upstream: list) -> list:
         
         def _toml_handler(text: str) -> int:
             try:
-                config = toml.loads(text) # 解析 TOML 格式字符串
+                config = toml.loads(text) # parse TOML format string
             except Exception as e:
                 print(f"[Err] Fail to parse toml config: {e}")
                 return -1
 
             deps = set()
-            try: # 核心依赖
+            try: # core dependencies
                 deps |= set(config["project"]["dependencies"])
             except KeyError: pass
-            try: # 可选依赖组
+            try: # optional dependency groups
                 optional_deps = config["project"]["optional-dependencies"] # dict
                 for optional_dep_group in optional_deps.values(): 
                     deps |= set(optional_dep_group)
@@ -240,7 +240,6 @@ def dependency_coverage_filter(upstream: list) -> list:
 
         def _txt_handler(text: str) -> int:
             """
-            Warning: 对同一依赖项的重复声明直接覆盖
             """
             _SKIP_LINE = "#-_`"
             def _clean_req_line(line: str) -> str:
@@ -255,7 +254,7 @@ def dependency_coverage_filter(upstream: list) -> list:
                 deps = set()
                 for line in text.splitlines():
                     line = _clean_req_line(line)
-                    # 跳过空行、注释、替换索引操作
+                    # Skip empty lines, comments, index substitutions
                     if not line or line[0] in _SKIP_LINE: continue
                         
                     req_text = line

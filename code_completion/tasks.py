@@ -7,11 +7,11 @@ from global_config import GITHUB_CODE_DOWNLOAD_BASE_DIR
 from utils import CodeHandler as CH
 from task_construction.get_api_signatures import AssignVisitor, get_api_ref_id
 
-DATA_BASE_DIR = GITHUB_CODE_DOWNLOAD_BASE_DIR # 存放 repoSrc 的根目录
+DATA_BASE_DIR = GITHUB_CODE_DOWNLOAD_BASE_DIR # root directory storing repoSrc
 MAX_CTX_LINE = 100
 
 def get_indent_regex(line):
-    """使用正则表达式获取缩进"""
+    """Use regex to get indentation"""
     match = re.match(r'^(\s*)', line)
     return match.group(1) if match else ''
 
@@ -20,7 +20,7 @@ class Task:
         # version info
         tpl:                str,
         version:            str,
-        # 用于从 repoSrc 中构建 prompt 和 GT 的信息      
+        # Info for building prompt and GT from repoSrc
         repo: str,
         file: str,  
         gt_start_lineno: int, 
@@ -30,7 +30,7 @@ class Task:
         self.version = version
         self.repo = repo
         
-        # 根据 meta 构建 prompt 和 GT
+        # Build prompt and GT based on meta
         src_file = path.join(DATA_BASE_DIR, repo, file)
         with open(src_file, 'r') as f:
             content = f.readlines()
@@ -58,7 +58,7 @@ class Task:
                 self.indent = '\t' + self.indent
         else:   self.indent = ''
 
-        # 构建 FQN 解析需要的内容
+        # Contents needed for FQN resolution
         tree = ast.parse(''.join(content), mode='exec')
         for node in ast.walk(tree):
             for child in ast.iter_child_nodes(node):
@@ -71,7 +71,7 @@ class Task:
 
         return
     
-    #  需要子类实现
+    # Subclass needs to implement this
     def prompt(self, omit: bool = False, is_GPT: bool = False) -> str: pass
     
     # 需要子类实现

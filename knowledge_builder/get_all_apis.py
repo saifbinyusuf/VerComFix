@@ -16,7 +16,7 @@ def read_file(path):
 
 def clean_api_name(api_name, version):
     """
-    尝试移除路径中包含的版本号或版本相关目录(如 numpy-1.3.0.numpy -> numpy)
+    Try to remove version number or version-related directory from path (e.g. numpy-1.3.0.numpy -> numpy)
     """
     # return api_name.replace(f"-{version}.", ".")
     pattern = rf'^.*-{re.escape(version)}\.'
@@ -78,7 +78,7 @@ def get_all_sources_module_from_package_dir(package_dir):
     top_level_file, sources_file = search_egg_dir(package_dir)
     sources = dict()
     if os.path.exists(top_level_file) and os.path.exists(sources_file):
-        # print('SOURCES文件可用')
+        # print('SOURCES file available')
         top_levels = read_file(top_level_file)
 
         for source_file in read_file(sources_file):
@@ -100,7 +100,7 @@ def get_all_sources_module_from_package_dir(package_dir):
                     # sources.append(top_level + source_file.split(top_level)[1])
                     sources[source_file] = package_dir + '/' + source_file
     else:
-        # print('找不到egg文件')
+        # print('egg file not found')
         for parent_dir, dir_names, file_names in os.walk(package_dir):
             for file_name in file_names:
                 if file_name.endswith('.py') and not file_name.__contains__('test') and not re.findall(
@@ -184,7 +184,7 @@ def get_all_apis_from_source(module_py, source_path):
 
 #     def normalize_apis(version, api_triples):
 #         """
-#         构造：
+#         Construct:
 #         - norm_set: set of cleaned api triple (used for diff)
 #         - mapping: dict of cleaned_name -> original_name
 #         """
@@ -196,10 +196,10 @@ def get_all_apis_from_source(module_py, source_path):
 #             # print(f"Normalizing API: {orig_name} -> {norm_name} (version: {version})")
 #             triple = (norm_name, tuple(api[1]), api[2])
 #             norm_set.add(triple)
-#             mapping[triple] = orig_name  # 关键：记录原始名称
+#             mapping[triple] = orig_name  # Key: record original name
 #         return norm_set, mapping
 
-#     # 初始化第一个版本
+#     # Initialize first version
 #     base_apis, base_map = normalize_apis(first_version, all_version_apis[first_version])
 #     diff[first_version] = {base_map[api]: '=' for api in base_apis}
 
@@ -208,14 +208,14 @@ def get_all_apis_from_source(module_py, source_path):
 #         result = {}
 
 #         for api in base_apis - current_apis:
-#             result[base_map[api]] = '-'  # 删除（用 base 版本的原始名）
+#             result[base_map[api]] = '-'  # Delete (using original name of base version)
 #         for api in current_apis - base_apis:
-#             result[current_map[api]] = '+'  # 新增（用 current 版本的原始名）
+#             result[current_map[api]] = '+'  # Add (using original name of current version)
 #         for api in base_apis & current_apis:
 #             result[current_map.get(api, base_map.get(api, api[0]))] = '='
 
 #         diff[version] = result
-#         base_apis, base_map = current_apis, current_map  # 更新基准版本
+#         base_apis, base_map = current_apis, current_map  # Update base version
 
 #     return diff
 
@@ -228,7 +228,7 @@ def get_diff_from_all_version_apis(all_version_apis):
     first_version = version_keys[0]
 
     # def normalize_apis(version, api_triples):
-    #     """清除 API 名中的版本号并返回 set of (api_name, params, has_return)"""
+    #     """Remove version number from API name and return set of (api_name, params, has_return)"""
     #     return {
     #         (clean_api_name(api[0], version), tuple(api[1]), api[2])
     #         for api in api_triples
@@ -237,7 +237,7 @@ def get_diff_from_all_version_apis(all_version_apis):
     def to_hashable(api):
         return (api[0], tuple(api[1]), api[2])
 
-    # 初始化第一个版本
+    # Initialize first version
     # base_apis = normalize_apis(first_version, all_version_apis[first_version])
     base_apis = {to_hashable(api) for api in all_version_apis[first_version]}
     diff[first_version] = {api[0]: '=' for api in base_apis}
@@ -248,14 +248,14 @@ def get_diff_from_all_version_apis(all_version_apis):
         result = {}
 
         for api in base_apis - current_apis:
-            result[api[0]] = '-'  # 被删除
+            result[api[0]] = '-'  # Removed
         for api in current_apis - base_apis:
-            result[api[0]] = '+'  # 新增
+            result[api[0]] = '+'  # Added
         # for api in base_apis & current_apis:
-        #     result[api[0]] = '='  # 未变
+        #     result[api[0]] = '='  # Unchanged
 
         diff[version] = result
-        base_apis = current_apis  # 更新基准
+        base_apis = current_apis  # Update base
 
     return diff
 
@@ -263,7 +263,7 @@ def get_diff_from_all_version_apis(all_version_apis):
 def save_package_version_apis_diff(package_name, all_diff):
     version_id = 0
     for version, apis in all_diff.items():
-        # 1. 查找当前 package-version 对应的 top_level 记录（任选一条 id）
+        # 1. Find top_level record for current package-version (pick any id)
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""
@@ -277,13 +277,13 @@ def save_package_version_apis_diff(package_name, all_diff):
                     continue
                 top_level_id = result[0]
 
-                # 2. 更新 top_level 表的 version_id 字段
+                # 2. Update version_id field in top_level table
                 cursor.execute("""
                     UPDATE top_level SET version_id=%s 
                     WHERE id=%s
                 """, (version_id, top_level_id))
 
-                # 3. 插入 differences 表记录
+                # 3. Insert differences table record
                 sql_list = []
                 for api, diff_flag in apis.items():
                     sql_list.append((top_level_id, api, diff_flag))

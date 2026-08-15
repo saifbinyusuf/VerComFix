@@ -149,7 +149,7 @@ if __name__ == '__main__':
             print(f'[Err] Fail to calc: {MODEL} {" (OMIT)" if OMIT else ""} {"API" if API else "Func"} Level')
             continue
         
-        # 需要分别按照 version_costrain_type \ api_change_type 统计
+        # Need to count separately according to version_costrain_type \ api_change_type
         if not OMIT: 
             v_cnt = {}
             for v_t in v_types: v_cnt[v_t] = [0 for _ in CompletionType]
@@ -178,7 +178,7 @@ if __name__ == '__main__':
                 tid, pred_func, _ = todo
                 pred_func = CH.clean_comments(pred_func)
  
-                # 遍历所有 API_CALL
+                # Iterate through all API_CALLs
                 deps = get_all_dependencies(os.path.join(DATA_BASE_DIR, task.repo))
                 dep_dict = build_package_version_dict(deps)
                 func_src = f'{task.head}\n{get_cleaned_func(pred_func)}'
@@ -204,7 +204,7 @@ if __name__ == '__main__':
             # count
             cnt[c_type.value-1] += 1
 
-            # 统计 version / api_change
+            # Count version / api_change
             if not OMIT: 
                 # version_constrain
                 if tid in pinned_ids: v_cnt['pinned'][c_type.value-1] += 1
@@ -216,7 +216,7 @@ if __name__ == '__main__':
                 if tid in param_ids: a_cnt['parameter'][c_type.value-1] += 1
                 if tid in retn_ids:  a_cnt['returntype'][c_type.value-1] += 1
             
-            # 统计需要 repair 的 case
+            # Count cases that need repair
             if API and not OMIT \
                 and tid in pinned_ids\
                 and c_type == CompletionType.BCR:
@@ -227,13 +227,13 @@ if __name__ == '__main__':
 
                 to_repair.append((tid, pred_stmt, _pred_fqn, desc, api_sig))
         
-        # 存储需要 repair 的 case
+        # Store cases that need repair
         if API and not OMIT:
             with open(f'{REPAIR_TASK_DIR}/{MODEL}.pkl', 'wb') as f:
                 print(f'Got {len(to_repair)} tasks to repair')
                 pickle.dump(to_repair, f)
         
-        # 打印计算结果
+        # Print calculation results
         print(f'% {MODEL} {OMIT} {"API" if API else "Func"} %')
         print(f'## Total ({len(todos)})')
         print(tabulate(

@@ -6,7 +6,7 @@ class StrictTopLevelFunctionExtractor:
         self.top_level_functions = []
     
     def extract(self, file_path, package_version_dict, source_code=''):
-        """提取不包含嵌套函数的顶级函数"""
+        """Extract top-level functions that do not contain nested functions"""
         try:
             self.is_eval = True
             if not source_code:
@@ -22,11 +22,11 @@ class StrictTopLevelFunctionExtractor:
             return self.top_level_functions
             
         except Exception as e:
-            print(f"错误: {e}")
+            print(f"Error: {e}")
             return []
     
     def _analyze_module(self, module_node):
-        """分析模块节点，提取顶级函数"""
+        """Analyze module node, extract top-level functions"""
         for node in module_node.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if not self._has_nested_functions(node):
@@ -34,25 +34,25 @@ class StrictTopLevelFunctionExtractor:
                     if func_info: self.top_level_functions.append(func_info)
     
     def _has_nested_functions(self, func_node):
-        """检查函数是否包含嵌套函数定义"""
+        """Check if function contains nested function definitions"""
         for child in ast.walk(func_node):
-            # 跳过函数节点本身
+            # Skip the function node itself
             if child is func_node:
                 continue
                 
-            # 如果找到任何函数定义节点，说明有嵌套函数
+            # If any function definition node is found, there are nested functions
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 return True
         
         return False
     
     def _extract_function_info(self, node):
-        """提取函数详细信息"""
+        """Extract function details"""
         head_offset = self._get_func_header_linenum(node)
         bg, ed = node.lineno+head_offset, getattr(node, 'end_lineno', -1)
         body_lines = ed-bg+1
 
-        # 没有装饰器、body 为 5~20 行
+        # No decorators, body is 5~20 lines
         if self.is_eval: pass
         elif head_offset \
             or len(node.decorator_list)>0 \
@@ -61,7 +61,7 @@ class StrictTopLevelFunctionExtractor:
             or (body_lines<5 or body_lines>20):
             return None
 
-        # 提取所有 func Call
+        # Extract all func Calls
         func_src   = ast.get_source_segment(self.code, node)
         tpl_calls = get_API_calls_from_funcnode(func_src, self.code, self.file_path, self.deps)
 
@@ -79,14 +79,14 @@ class StrictTopLevelFunctionExtractor:
     
     def _get_func_header_linenum(self, node):
         lines = ast.get_source_segment(self.code, node).split('\n')
-        # 找到函数头的结束（通常是冒号所在行）
+        # Find end of function header (usually the line with colon)
         for i, line in enumerate(lines):
             if line.strip().endswith(':'):
                 return i + 1
 
 def get_strict_top_level_functions(file_path, package_version_dict, source_code=''):
     """
-    获取所有不包含嵌套函数的顶级函数
+    Get all top-level functions that do not contain nested functions
     """
     extractor = StrictTopLevelFunctionExtractor()
     return extractor.extract(file_path, package_version_dict, source_code)

@@ -65,7 +65,7 @@ def _init_gpt_4o():
     return openai.OpenAI(
         api_key=token,
         base_url='https://api.openai-proxy.org/v1'
-    ), "gpt-4o", (2.5*1.5 / 1E6, 10*1.5 / 1E6) # CloseAI 的定价
+    ), "gpt-4o", (2.5*1.5 / 1E6, 10*1.5 / 1E6) # OpenAI pricing
 
 def _init_gemini_2_5_flash():
     token = getenv('OPENAI_API_KEY')
@@ -75,11 +75,11 @@ def _init_gemini_2_5_flash():
 
     return genai.Client(
         api_key=token,
-        vertexai=True, # 优先使用vertexai协议访问，稳定性更高
+        vertexai=True, # prioritize vertexai protocol for better stability
         http_options={
             "base_url": "https://api.openai-proxy.org/google"
         },
-    ), "gemini-2.5-flash", (2*1.5 / 1E6, 12*1.5 / 1E6) # CloseAI 的定价
+    ), "gemini-2.5-flash", (2*1.5 / 1E6, 12*1.5 / 1E6) # OpenAI pricing
 
 MODEL_FACTORY = {
     # CodeLLM
@@ -110,18 +110,18 @@ class CodeLLMCompletionEngine(CompletionEngine):
         return
     
     """
-    输出一个 len == cand_num 的 res 矩阵（已经 decode 好了）
+    Outputs a res matrix of len == cand_num (already decoded)
     """
     def complete(self,
         task: Task, 
         beam_size=1,
-        # 采用确定性方法（贪婪搜索策略）
+        # Use deterministic method (greedy search strategy)
         cand_num=1,
         do_sample=False,
         temperature=1.0,
         top_k=None,
         top_p=None,
-        # 是否拼接 TPL 知识
+        # Whether to append TPL knowledge
         omit: bool = False,
         max_len:int = None
     ) -> str:
@@ -164,7 +164,7 @@ class GLMCompletionEngine(CompletionEngine):
     ):
         self.model = model
         self.client = client
-        # 计费
+        # Billing
         self.input_tokens = 0
         self.output_tokens = 0
         self.price = price
@@ -215,7 +215,7 @@ class GLMCompletionEngine(CompletionEngine):
             print(e.response)
             return ""
                 
-        # 计费
+        # Billing
         if self.useGemini:
             self.input_tokens  += response.usage_metadata.prompt_token_count
             self.output_tokens += response.usage_metadata.total_token_count
@@ -226,10 +226,10 @@ class GLMCompletionEngine(CompletionEngine):
             completion_text = response.choices[0].message.content
         
         try:
-            # 后处理: 提取 ``` 之间的代码块
+            # Post-processing: extract code blocks between ```
             completion = CH.clean_gpt_response(completion_text)
             result = task.handle_completion(completion)
-        except TypeError as e: # 返回可能为空
+        except TypeError as e: # return might be None
             print(f'Empty answer, {e = }')
             print(f'\n\nResponse is:\n{response = }')
             result = ""

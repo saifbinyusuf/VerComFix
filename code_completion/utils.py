@@ -40,8 +40,8 @@ class CodeHandler:
         
         def _normalize(_line:str):
             if _line.lstrip().startswith('@'): return _line.lstrip()+'\n'
-            _line = _line.strip().rstrip(" \\")     # 合并换行
-            _line = re.sub(r"\s+", "", _line) if remove_space else re.sub(r"\s+", " ", _line) # 连续空格
+            _line = _line.strip().rstrip(" \\")     # merge newlines
+            _line = re.sub(r"\s+", "", _line) if remove_space else re.sub(r"\s+", " ", _line) # consecutive spaces
             return _line
 
         lines = code.splitlines()
@@ -50,7 +50,7 @@ class CodeHandler:
 
         try:
             stmt = _normalize(lines.pop(0))
-        except IndexError: # 只有注释，没有内容
+        except IndexError: # only comments, no content
             return ''
         while _unclosed(stmt) and lines: stmt += _normalize(lines.pop(0))
 
@@ -59,12 +59,12 @@ class CodeHandler:
     @staticmethod
     def get_first_function(code: str) -> str | None:
         lines = code.splitlines()
-        # 去掉函数定义前的内容
+        # Remove content before function definition
         while lines and not (
             lines[0].lstrip().startswith("def ") or lines[0].lstrip().startswith("async def")
         ): lines.pop(0)
 
-        # 没有函数定义
+        # No function definition
         if not lines: return  None
 
         indent = len(re.search("^\s*", lines[0]).group(0))
@@ -73,7 +73,7 @@ class CodeHandler:
         return func
     
 def has_function_call(code_line: str):
-    """使用 AST 分析判断代码行是否包含函数调用"""
+    """Use AST to analyze if code line contains a function call"""
     try:
         tree = ast.parse(code_line)
         for node in ast.walk(tree):
@@ -87,15 +87,15 @@ def has_function_call(code_line: str):
 
 def extract_first_function_call(code_line):
     pattern = r'''
-        (?:^|[^a-zA-Z0-9_\.])      # 前面不是字母数字下划线或点（或者是行首）
-        (                           # 开始捕获组
-            (?:                     # 非捕获组：匹配属性访问链
-                [a-zA-Z_][a-zA-Z0-9_]*  # 标识符
-                (?:\s*\.\s*[a-zA-Z_][a-zA-Z0-9_]*)*  # 可选的 .属性 链
+        (?:^|[^a-zA-Z0-9_\.])      # Not preceded by alphanumeric, underscore or dot (or at line start)
+        (                           # Start capturing group
+            (?:                     # Non-capturing group: match attribute access chain
+                [a-zA-Z_][a-zA-Z0-9_]*  # Identifier
+                (?:\s*\.\s*[a-zA-Z_][a-zA-Z0-9_]*)*  # Optional .attribute chain
             )
-            \s*                     # 可选空白
-            \(                      # 左括号
-        )                           # 结束捕获组
+            \s*                     # Optional whitespace
+            \(                      # Left parenthesis
+        )                           # End capturing group
     '''
     
     match = re.search(pattern, code_line, re.VERBOSE)
@@ -103,11 +103,11 @@ def extract_first_function_call(code_line):
 
 def extract_outermost_function_call(code_line):
     """
-    提取一行代码中最外层的函数调用
-    返回调用字符串和相关信息
+    Extract the outermost function call in a single line of code
+    Return call string and related info
     """
     def find_outermost_call(node):
-        """递归查找最外层的函数调用"""
+        """Recursively find outermost function call"""
         if isinstance(node, ast.Module):
             if node.body:
                 return find_outermost_call(node.body[0])
@@ -138,7 +138,7 @@ def extract_outermost_function_call(code_line):
         return None
 
     def extract_function_name(func_node):
-        """提取函数名称"""
+        """Extract function name"""
         if isinstance(func_node, ast.Name):
             return func_node.id
         elif isinstance(func_node, ast.Attribute):
@@ -150,7 +150,7 @@ def extract_outermost_function_call(code_line):
             return "unknown"
 
     def extract_nested_attribute(node):
-        """提取嵌套属性访问链"""
+        """Extract nested attribute access chain"""
         if isinstance(node, ast.Attribute):
             prefix = extract_nested_attribute(node.value)
             return f"{prefix}.{node.attr}" if prefix else node.attr
@@ -163,7 +163,7 @@ def extract_outermost_function_call(code_line):
         tree = ast.parse(code_line)
         outermost_call = find_outermost_call(tree)
         
-        if outermost_call: # 提取调用信息
+        if outermost_call: # extract call info
             return \
                 ast.unparse(outermost_call),\
                 extract_function_name(outermost_call.func),\

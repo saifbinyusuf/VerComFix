@@ -31,8 +31,8 @@ def get_py_files(project_dir):
 
 def normalize_api_prefix(api_name):
     """
-    例如将 'numpy.array' -> 'numpy'
-    将 'sklearn.linear_model.LogisticRegression' -> 'sklearn'
+    For example, converting 'numpy.array' -> 'numpy'
+    Convert 'sklearn.linear_model.LogisticRegression' -> 'sklearn'
     """
     return api_name.split('.')[0]
 
@@ -63,13 +63,13 @@ def enrich_apis_with_versions(apis, package_version_dict):
     return enriched
 
 def print_results(results):
-    print(f"{'API 限定名':40} {'文件路径':40} {'起始行号':8} {'结束行号':8} {'版本信息'}")
+    print(f"{'API Qualified Name':40} {'File Path':40} {'Start Line':8} {'End Line':8} {'Version Info'}")
     print('-' * 100)
     for item in results:
         print(f"{item['api']:<40} {item['file']:<40} {item['lineno']:<8} {item['end_lineno']:<8} {item['version'] or 'N/A'}")
 
 def extract_repo_api(project_dir):
-    print(f"[INFO] 提取依赖版本信息...")
+    print(f"[INFO] Extracting dependency version info...")
     deps = get_all_dependencies(project_dir)
     if len(deps) == 0: return
     dep_dict = build_package_version_dict(deps)
@@ -77,18 +77,18 @@ def extract_repo_api(project_dir):
     cnt_lib = len(set(dep_dict.keys()) & TPLs)
     if cnt_lib <= 5: return
 
-    print(f"[INFO] 提取源代码文件...")
+    print(f"[INFO] Extracting source code files...")
     py_files = get_py_files(project_dir)
 
-    print(f"[INFO] 提取 API 调用...")
+    print(f"[INFO] Extracting API calls...")
     apis = get_all_call_apis_from_sources(py_files, dep_dict)
 
-    print(f"[INFO] 保存到数据库...")
+    print(f"[INFO] Saving to database...")
     save_api_calls(apis)
 
-"""处理 Function-Level Task"""
+"""Process Function-Level Task"""
 def extract_repo_func(project_dir):
-    print(f"[INFO] 提取依赖版本信息...")
+    print(f"[INFO] Extracting dependency version info...")
     deps = get_all_dependencies(project_dir)
     if len(deps) == 0: return
     dep_dict = build_package_version_dict(deps)
@@ -96,11 +96,11 @@ def extract_repo_func(project_dir):
     cnt_lib = len(set(dep_dict.keys()) & TPLs)
     if cnt_lib <= 5: return
 
-    print(f"[INFO] 提取源代码文件...")
+    print(f"[INFO] Extracting source code files...")
     py_files = get_py_files(project_dir)
 
-    print(f"[INFO] 提取包含 TPL 调用 的 Function 定义 ...")
+    print(f"[INFO] Extracting function definitions containing TPL calls...")
     funcs = get_all_funcnode_from_sources(py_files, dep_dict)
 
-    print(f"[INFO] 保存到数据库...")
+    print(f"[INFO] Saving to database...")
     save_func_info(funcs)

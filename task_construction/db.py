@@ -18,7 +18,7 @@ def get_connection():
 
 
 def init_db():
-    """初始化数据库表结构"""
+    """Initialize database table structure"""
     try:
         create_database_if_not_exists()
         with get_connection() as conn:
@@ -50,30 +50,30 @@ def init_db():
                     )
                 """)
     except Exception as e:
-        print(f"数据库初始化失败: {e}")
+        print(f"Database initialization failed: {e}")
         exit(0)
 
 def classify_version_type(version_str: str) -> str:
-    """根据版本字符串判断版本类型"""
+    """Determine version type based on version string"""
     if not version_str or version_str.strip() == "":
-        return "不明确"
-    # 简单判断是否是范围版本（包含 >= <= < > 逗号）
+        return "ambiguous"
+    # Simple check for range version (contains >= <= < > comma)
     if any(op in version_str for op in [">=", "<=", ">", "<", ",", "~="]):
-        return "范围"
-    # 明确版本，比如 ==1.2.3 或 !=0.24.1
+        return "range"
+    # Explicit version, e.g. ==1.2.3 or !=0.24.1
     if version_str.startswith("==") or version_str.startswith("!=") or version_str.startswith("~="):
-        return "明确"
-    # 其他情况归类为范围（保守处理）
-    return "范围"
+        return "explicit"
+    # Other cases classified as range (conservative approach)
+    return "range"
 
 def save_api_calls(call_data: List[Dict]):
-    """保存 API 调用记录到数据库，新增版本类型和版本字段"""
+    """Save API call records to database, adding version type and version fields"""
     with get_connection() as conn:
         with conn.cursor() as cursor:
             for item in call_data:
                 version_str = item.get("version", "") or ""
                 version_type = classify_version_type(version_str)
-                if version_type == '不明确': continue
+                if version_type == 'ambiguous': continue
                 try:
                     cursor.execute(
                         """INSERT INTO api_calls 
@@ -90,7 +90,7 @@ def save_api_calls(call_data: List[Dict]):
                         )
                     )
                 except pymysql.IntegrityError:
-                    # 唯一约束冲突时忽略
+                    # Ignore on unique constraint conflict
                     continue
 
 def save_func_info(func_info: List[Dict]):
@@ -99,7 +99,7 @@ def save_func_info(func_info: List[Dict]):
             for item in func_info:
                 version_str = item.get("version", "") or ""
                 version_type = classify_version_type(version_str)
-                if version_type == '不明确': continue
+                if version_type == 'ambiguous': continue
                 try:
                     cursor.execute(
                         """INSERT INTO func_task
@@ -118,12 +118,12 @@ def save_func_info(func_info: List[Dict]):
                         )
                     )
                 except pymysql.IntegrityError:
-                    # 唯一约束冲突时忽略
+                    # Ignore on unique constraint conflict
                     continue
 
 
 def get_api_calls_by_file(file_path: str) -> List[Dict]:
-    """根据文件路径获取 API 调用记录"""
+    """Get API call records by file path"""
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
@@ -143,7 +143,7 @@ def get_api_calls_by_file(file_path: str) -> List[Dict]:
             ]
 
 
-# 初始化测试
+# Initialize test
 if __name__ == "__main__":
     init_db()
-    print("✅ MySQL 数据库和表结构初始化完成")
+    print("MySQL database and table structure initialized")

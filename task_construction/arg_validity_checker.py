@@ -1,6 +1,6 @@
 """
-ArgumentsAnalyser: 用于分析 Function Call 中的实参、提取实参中涉及的 variable name
-GlobalVariableDefFinder: 获取所有的 intra-file dependency 变量名
+ArgumentsAnalyser: Analyzes actual arguments in Function Calls, extracts variable names from arguments
+GlobalVariableDefFinder: Gets all intra-file dependency variable names
 """
 
 import ast
@@ -12,19 +12,19 @@ class ArgumentsAnalyser():
 
     def extract_arguments_info(self, call_node: ast.Call) -> Dict[str, List[Dict]]:
         """
-        提取函数调用的参数信息，区分不同类型（Python 3.10+）
+        Extract function call argument info, distinguishing types (Python 3.10+)
         """
         arguments_info = {
             'positional_args': [],
             'keyword_args': []
         }
         
-        # 处理位置参数
+        # Handle positional arguments
         for i, arg in enumerate(call_node.args):
             arg_info = self.analyze_argument(arg, f'arg_{i}')
             arguments_info['positional_args'].append(arg_info)
         
-        # 处理关键字参数
+        # Handle keyword arguments
         for kw_arg in call_node.keywords:
             arg_info = self.analyze_argument(kw_arg.value, kw_arg.arg)
             arguments_info['keyword_args'].append({
@@ -36,7 +36,7 @@ class ArgumentsAnalyser():
 
     def analyze_argument(self, arg_node: ast.AST, arg_name: str = '') -> Dict[str, Any]:
         """
-        分析单个参数节点，区分字符串、变量名等类型
+        Analyze a single argument node, distinguishing strings, variable names, etc.
         """    
         try:
             src = ast.get_source_segment(self.source_code, arg_node)
@@ -58,7 +58,7 @@ class ArgumentsAnalyser():
             'is_expression': False
         }
         
-        # 处理常量值
+        # Handle constant values
         if isinstance(arg_node, ast.Constant):
             arg_info['value'] = arg_node.value
             arg_info['value_type'] = type(arg_node.value).__name__
@@ -76,26 +76,26 @@ class ArgumentsAnalyser():
                 arg_info['is_none'] = True
                 arg_info['is_literal'] = True
         
-        # 处理变量名
+        # Handle variable names
         elif isinstance(arg_node, ast.Name):
             arg_info['value'] = arg_node.id
             arg_info['value_type'] = 'variable'
             arg_info['is_variable'] = True
         
-        # 处理属性访问
+        # Handle attribute access
         elif isinstance(arg_node, ast.Attribute):
             arg_info['value'] = ast.get_source_segment(self.source_code, arg_node)
             arg_info['value_type'] = 'attribute'
             arg_info['is_expression'] = True
         
-        # 处理列表
+        # Handle lists
         elif isinstance(arg_node, ast.List):
             elements = [self.analyze_argument(el, self.source_code) for el in arg_node.elts]
             arg_info['value'] = elements
             arg_info['value_type'] = 'list'
             arg_info['is_expression'] = True
         
-        # 处理字典
+        # Handle dicts
         elif isinstance(arg_node, ast.Dict):
             dict_value = {}
             for key, value in zip(arg_node.keys, arg_node.values):
@@ -106,7 +106,7 @@ class ArgumentsAnalyser():
             arg_info['value_type'] = 'dict'
             arg_info['is_expression'] = True
         
-        # 处理其他表达式
+        # Handle other expressions
         else:
             arg_info['value'] = ast.get_source_segment(self.source_code, arg_node)
             arg_info['value_type'] = 'expression'
@@ -115,7 +115,7 @@ class ArgumentsAnalyser():
         return arg_info
 
     def get_varnames_in_args(self, call_node: ast.Call, args: List = []) -> Set[str]:
-        """获取实参中的所有变量名"""
+        """Get all variable names from arguments"""
         if not args: args = self.extract_arguments_info(call_node)
         todos = args.get('keyword_args', []) + args.get('positional_args', [])
 
@@ -127,8 +127,8 @@ class ArgumentsAnalyser():
 
 class GlobalVariableDefFinder(ast.NodeVisitor):
     """
-    一个访问者，用于查找在模块全局作用域中定义的所有变量名。
-    它会忽略函数和类内部定义的变量。
+    A visitor that finds all variable names defined in module global scope.
+    It ignores variables defined inside functions and classes.
     """
     def __init__(self):
         super().__init__()
@@ -184,7 +184,7 @@ class GlobalVariableDefFinder(ast.NodeVisitor):
             self.defined_vars.add(node.target.id)
         self.generic_visit(node)
 
-    """忽略 inter file dependencies"""
+    """Ignore inter-file dependencies"""
     def visit_Import(self, node): return
     def visit_ImportFrom(self, node): return
 

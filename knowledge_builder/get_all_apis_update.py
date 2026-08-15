@@ -3,6 +3,7 @@ import fnmatch
 
 import os
 import re
+from pathlib import Path
 from packaging.version import parse as parse_version
 from db import *
 
@@ -17,7 +18,7 @@ def read_file(path):
 
 def clean_api_name(api_name, version):
     """
-    尝试移除路径中包含的版本号或版本相关目录(如 numpy-1.3.0.numpy -> numpy)
+    Try to remove version number or version-related directory from path (e.g. numpy-1.3.0.numpy -> numpy)
     """
     # return api_name.replace(f"-{version}.", ".")
     pattern = rf'^.*-{re.escape(version)}\.'
@@ -79,7 +80,7 @@ def get_all_sources_module_from_package_dir(package_dir):
     top_level_file, sources_file = search_egg_dir(package_dir)
     sources = dict()
     if os.path.exists(top_level_file) and os.path.exists(sources_file):
-        # print('SOURCES文件可用')
+        # print('SOURCES file available')
         top_levels = read_file(top_level_file)
 
         for source_file in read_file(sources_file):
@@ -99,7 +100,7 @@ def get_all_sources_module_from_package_dir(package_dir):
                     # sources.append(top_level + source_file.split(top_level)[1])
                     sources[source_file] = package_dir + '/' + source_file
     else:
-        # print('找不到egg文件')
+        # print('egg file not found')
         for parent_dir, dir_names, file_names in os.walk(package_dir):
             for file_name in file_names:
                 if file_name.endswith('.py') and not file_name.__contains__('test') and not file_name == 'setup.py':
@@ -153,12 +154,12 @@ def get_all_apis_from_source(module_py, source_path, export_map=None):
 
     def get_all_exposed_paths(fullname):
         """
-        返回原始路径 + 所有可能映射出的暴露路径。
-        例如：
+        Return original path + all possible exposed paths mapped.
+        For example:
         fullname = sklearn.linear_model._logistic.LogisticRegression.__init__
-        export_map 中有：
+        If export_map contains:
             'sklearn.linear_model._logistic.LogisticRegression' → 'sklearn.linear_model.LogisticRegression'
-        则应返回：
+        Then it should return:
             - sklearn.linear_model._logistic.LogisticRegression.__init__
             - sklearn.linear_model.LogisticRegression.__init__
         """
@@ -186,7 +187,7 @@ def get_all_apis_from_source(module_py, source_path, export_map=None):
 
         return results
 
-    # 处理模块级函数
+    # Process module-level functions
     functions = [n for n in module_ast.body if isinstance(n, ast.FunctionDef)]
     for func in functions:
         base_full_name = f"{module_call_path}.{func.name}"
@@ -196,7 +197,7 @@ def get_all_apis_from_source(module_py, source_path, export_map=None):
             api_signature = (full_name, params, has_return)
             all_apis.append(api_signature)
 
-    # 处理类及其方法
+    # Process classes and their methods
     classes = [n for n in module_ast.body if isinstance(n, ast.ClassDef)]
     for cls in classes:
         for m in cls.body:
@@ -221,7 +222,7 @@ def get_all_apis_from_source(module_py, source_path, export_map=None):
 
 #     def normalize_apis(version, api_triples):
 #         """
-#         构造：
+#         Construct:
 #         - norm_set: set of cleaned api triple (used for diff)
 #         - mapping: dict of cleaned_name -> original_name
 #         """
@@ -233,10 +234,10 @@ def get_all_apis_from_source(module_py, source_path, export_map=None):
 #             # print(f"Normalizing API: {orig_name} -> {norm_name} (version: {version})")
 #             triple = (norm_name, tuple(api[1]), api[2])
 #             norm_set.add(triple)
-#             mapping[triple] = orig_name  # 关键：记录原始名称
+#             mapping[triple] = orig_name  # Key: record original name
 #         return norm_set, mapping
 
-#     # 初始化第一个版本
+#     # Initialize first version
 #     base_apis, base_map = normalize_apis(first_version, all_version_apis[first_version])
 #     diff[first_version] = {base_map[api]: '=' for api in base_apis}
 
@@ -245,14 +246,14 @@ def get_all_apis_from_source(module_py, source_path, export_map=None):
 #         result = {}
 
 #         for api in base_apis - current_apis:
-#             result[base_map[api]] = '-'  # 删除（用 base 版本的原始名）
+#             result[base_map[api]] = '-'  # Delete (using original name of base version)
 #         for api in current_apis - base_apis:
-#             result[current_map[api]] = '+'  # 新增（用 current 版本的原始名）
+#             result[current_map[api]] = '+'  # Add (using original name of current version)
 #         for api in base_apis & current_apis:
 #             result[current_map.get(api, base_map.get(api, api[0]))] = '='
 
 #         diff[version] = result
-#         base_apis, base_map = current_apis, current_map  # 更新基准版本
+#         base_apis, base_map = current_apis, current_map  # Update base version
 
 #     return diff
 
@@ -265,7 +266,7 @@ def get_diff_from_all_version_apis(all_version_apis):
     first_version = version_keys[0]
 
     def to_hashable(api):
-        return (api[0], tuple(api[1]), api[2])  # 限定名, 参数, 返回标志
+        return (api[0], tuple(api[1]), api[2])  # qualified name, params, return flag
 
     base_apis = {to_hashable(api) for api in all_version_apis[first_version]}
     diff[first_version] = {api: '=' for api in base_apis}
@@ -275,9 +276,9 @@ def get_diff_from_all_version_apis(all_version_apis):
         result = {}
 
         for api in base_apis - current_apis:
-            result[api] = '-'  # 被删除
+            result[api] = '-'  # Removed
         for api in current_apis - base_apis:
-            result[api] = '+'  # 新增
+            result[api] = '+'  # Added
 
         diff[version] = result
         base_apis = current_apis
@@ -290,7 +291,7 @@ def save_package_version_apis_diff(package_name, all_diff):
     for version, apis in all_diff.items():
         with get_connection() as conn:
             with conn.cursor() as cursor:
-                # 获取 top_level 记录
+                # Get top_level record
                 cursor.execute("""
                     SELECT id FROM top_level 
                     WHERE package_name=%s AND package_version=%s 
@@ -302,20 +303,20 @@ def save_package_version_apis_diff(package_name, all_diff):
                     continue
                 top_level_id = result[0]
 
-                # 更新 version_id
+                # Update version_id
                 cursor.execute("""
                     UPDATE top_level SET version_id=%s 
                     WHERE id=%s
                 """, (version_id, top_level_id))
 
-                # 插入 differences 表
+                # Insert into differences table
                 sql_list = []
                 for api_signature, diff_flag in apis.items():
                     api_name, params, has_return = api_signature
                     param_str = ', '.join(params)
                     sql_list.append((top_level_id, api_name, param_str, has_return, diff_flag))
 
-                # 若无变更，也插入占位记录
+                # If no changes, still insert a placeholder record
                 if not sql_list:
                     sql_list.append((top_level_id, '', '', False, '='))
 
@@ -330,9 +331,9 @@ def save_package_version_apis_diff(package_name, all_diff):
 
 def build_export_map(source_map):
     """
-    构建 {真实路径 → 暴露路径} 映射。例如：
+    Build {real path -> exposed path} mapping. For example:
     requests.models.PreparedRequest -> requests.PreparedRequest
-    或支持通配符：
+    Or support wildcards:
     numpy.core.fromnumeric.* -> numpy.core.*
     """
     export_map = {}
@@ -346,7 +347,7 @@ def build_export_map(source_map):
                 print(f"Error parsing {abs_path}: {e}")
                 continue
 
-            # 例如 module_path = numpy/core/__init__.py → numpy.core
+            # E.g. module_path = numpy/core/__init__.py -> numpy.core
             parent_module = module_path.replace('.py', '').replace('/', '.').replace('\\', '.')
             parent_module = parent_module.replace('.__init__', '').lstrip('.')
 
@@ -357,9 +358,9 @@ def build_export_map(source_map):
                         orig = alias.name
                         asname = alias.asname or orig
 
-                        # 处理相对导入
+                        # Handle relative imports
                         if node.level == 1:
-                            # 相对导入，补全路径
+                            # Relative import, complete the path
                             if mod:
                                 imported_module = f"{parent_module}.{mod}"
                             else:
@@ -367,7 +368,7 @@ def build_export_map(source_map):
                         else:
                             imported_module = mod
 
-                        # 清理前导点（可能由错误拼接产生）
+                        # Clean leading dots (possibly produced by incorrect concatenation)
                         imported_module = imported_module.lstrip('.')
 
                         if orig == "*":
@@ -407,11 +408,11 @@ def main():
                 for source in all_sources:
                     version_apis.extend(get_all_apis_from_source(source, all_sources[source], export_map))
                 
-                # 保存API签名到数据库
+                # Save API signatures to database
                 save_api_signatures(package_name, version, version_apis)
                 print(f"Saved {len(version_apis)} APIs for {package_name}-{version} to database")
                 
-        # 对比不同版本间 API 差异
+        # Compare API differences between versions
         if all_version_list:
             all_version_apis = {}
             for version in all_version_list:

@@ -113,10 +113,10 @@ def get_func_calls(code, tree):
                 lineno = getattr(node, "lineno", -1)
                 end_lineno = getattr(node, "end_lineno", lineno)
                 if code:
-                    # 找到 positional & keyword 中内容为 variable 的内容
+                    # Find variable content in positional & keyword arguments
                     var_names = arg_analyser.get_varnames_in_args(node)
         
-                    # 检查 variable 是否为 intra-File dependency
+                    # Check if variable is an intra-File dependency
                     if var_names.issubset(intra_file_deps):
                         func_calls.append((call_visitor.name, kw_visitor.name, lineno, end_lineno))
                     else:

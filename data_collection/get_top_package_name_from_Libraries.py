@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 
 import requests
 from pathlib import Path
-base_time = 30  # 基础等待时间
-variation = 10  # 最大浮动范围
+base_time = 30  # Base wait time
+variation = 10  # Max fluctuation range
 
 def _make_request(url, retries=3, timeout=10, header=1):
         headers1 = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
@@ -38,10 +38,10 @@ def _make_request(url, retries=3, timeout=10, header=1):
                     response = requests.get(url,headers=headers1,timeout=timeout)
                 return response
             except requests.exceptions.RequestException as e:
-                print(f"请求异常: {e}，重试 {attempt + 1}/{retries}")
+                print(f"Request exception: {e}, retrying {attempt + 1}/{retries}")
         
-        # 如果所有重试都失败，返回 None 或抛出异常
-        print(f"请求失败，已达到最大重试次数: {retries}，URL: {url}")
+        # If all retries fail, return None or raise exception
+        print(f"Request failed, reached max retries: {retries}, URL: {url}")
         return None
 
 def write_to_file(file, context, write_type):
@@ -64,7 +64,7 @@ def top_package_name():
             soup = BeautifulSoup(r.text, 'lxml')
             all_projects = soup.find_all('div', class_='project')
             if not all_projects:
-                print('没有更多数据了')
+                print('No more data')
                 return
             for project in all_projects:
                 if rank > 10000:
@@ -73,11 +73,11 @@ def top_package_name():
                 write_to_file('./rank.txt', '%s@@%s' % (str(rank), project.find('a').text), 'a')
                 rank += 1
         else:
-            print('第%s页' % i)
+            print('Page %s' % i)
             return
 
         sleep_time = random.uniform(base_time - variation, base_time + variation)
-        print(f'休息 {sleep_time:.2f} 秒')
+        print(f'Sleeping for {sleep_time:.2f} seconds')
         time.sleep(sleep_time)
 
 

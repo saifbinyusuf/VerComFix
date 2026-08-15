@@ -1,12 +1,12 @@
 from enum import Enum, auto
 
-# 下面是和 API Stability Check 相关的类型定义
+# The following are type definitions related to API Stability Check
 class APIShiftType(Enum):
     METHOD_NAME = "method_name"
     PARAMETERS  = "parameters"
     RETURN_TYPE = "return_type"
 
-# 下面是和版本约束相关的类型定义
+# The following are type definitions related to version constraints
 class VersionConstrainType(Enum):
     OMITTED       = "omitted"
     PINNED        = "pinned"

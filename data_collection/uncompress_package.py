@@ -5,6 +5,7 @@ import tempfile
 import logging
 from packaging.version import parse as parse_version
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm
 
 log_file = 'unpack_log.txt'
 logging.basicConfig(
@@ -16,8 +17,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
+_console = logging.StreamHandler()
+_console.setLevel(logging.WARNING)
+_console.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+logger.addHandler(_console)
+
 def get_packages_path_order_by_time(packages_dir):
-    # logger.info(f"扫描目录（按时间）: {packages_dir}")
+    # logger.info(f"Scanning directory (by time): {packages_dir}")
     packages_list = os.listdir(packages_dir)
     if packages_list:
         packages_list = sorted(packages_list, key=lambda x: os.path.getmtime(os.path.join(packages_dir, x)))
@@ -25,7 +31,7 @@ def get_packages_path_order_by_time(packages_dir):
     return []
 
 def get_packages_path_order_by_name(packages_dir):
-    # logger.info(f"扫描目录（按版本）: {packages_dir}")
+    # logger.info(f"Scanning directory (by version): {packages_dir}")
     packages_list = os.listdir(packages_dir)
 
     def extract_version(folder_name):
@@ -46,7 +52,7 @@ def unpack_single_package(project_path, packages_dir, ff):
     dest_dir = packages_dir / version_folder_name
 
     if dest_dir.exists():
-        logger.info(f"{ff} 已存在，跳过")
+        logger.info(f"{ff} already exists, skipping")
         return
 
     try:
@@ -64,28 +70,39 @@ def unpack_single_package(project_path, packages_dir, ff):
                     else:
                         shutil.copy2(item, dest_dir / item.name)
 
-        logger.info(f"成功解压: {ff}")
+        logger.info(f"Extracted: {ff}")
     except Exception as e:
-        logger.error(f"解压失败 {ff}: {e}")
+        logger.error(f"Extract failed {ff}: {e}")
 
 def main():
-    tasks = []
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        for f in os.listdir(projects):
-            project_path = Path(projects) / f
-            packages_dir = Path(packages) / f
-            packages_dir.mkdir(parents=True, exist_ok=True)
+    pkg_names = [f for f in os.listdir(projects) if (Path(projects) / f).is_dir()]
+    pkg_bar = tqdm(pkg_names, desc="Packages", unit="pkg")
 
-            if project_path.is_dir():
-                for ff in get_packages_path_order_by_time(project_path):
-                    future = executor.submit(unpack_single_package, project_path, packages_dir, ff)
-                    tasks.append(future)
+    for f in pkg_bar:
+        project_path = Path(projects) / f
+        packages_dir = Path(packages) / f
+        packages_dir.mkdir(parents=True, exist_ok=True)
+        pkg_bar.set_postfix_str(f)
 
-        # 等待所有任务完成
-        for future in as_completed(tasks):
-            future.result()
+        archives = get_packages_path_order_by_time(project_path)
+        if not archives:
+            continue
 
-    logger.info("全部解压完成！")
+        tasks = []
+        ver_bar = tqdm(total=len(archives), desc=f"  {f}", unit="ver", leave=False)
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            for ff in archives:
+                future = executor.submit(unpack_single_package, project_path, packages_dir, ff)
+                tasks.append(future)
+
+            for future in as_completed(tasks):
+                future.result()
+                ver_bar.update(1)
+
+        ver_bar.close()
+
+    print("All packages extracted.")
 
 if __name__ == '__main__':
     current_folder = Path(__file__).resolve().parent
