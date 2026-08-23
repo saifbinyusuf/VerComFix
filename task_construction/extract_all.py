@@ -15,7 +15,7 @@ def get_folders_in_directory(path: str):
 
 def get_target_repo_names():
     """Get repos that have commit date info"""
-    file = os.path.join(os.path.dirname(__file__), 'data_collection', 'repo_commit_info.pkl')
+    file = os.path.join(os.path.dirname(__file__), '..', 'data_collection', 'repo_commit_info.pkl')
     repo_infos = []
     try:
         with open(file, 'rb') as f:
