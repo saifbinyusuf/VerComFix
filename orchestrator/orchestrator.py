@@ -1,7 +1,10 @@
 # orchestrator/orchestrator.py
 import subprocess, json, os, pickle, yaml, argparse, time
+from dotenv import load_dotenv
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(BASE, '.env'))
+
 STATUS_FILE = os.path.join(BASE, 'data', 'status.json')
 LOG_DIR = os.path.join(BASE, 'logs')
 
@@ -36,7 +39,8 @@ download_base_dir = ../data/repos
 def cap_selected_repos(profile):
     pkl_path = os.path.join(BASE, 'data_collection', 'selectRepo.pkl')
     d = pickle.load(open(pkl_path, 'rb'))
-    d = [r for r in d if r.get('size', 0) < profile['repo']['max_repo_size_kb']]
+    # selectRepo.pkl stores tuples like ('owner/repo', 'branch') — not dicts
+    # size filtering is not possible at this stage; just cap by count
     d = d[:profile['repo']['max_repo_count']]
     pickle.dump(d, open(pkl_path, 'wb'))
     return len(d)
@@ -61,15 +65,27 @@ def write_status(status):
     os.makedirs(os.path.dirname(STATUS_FILE), exist_ok=True)
     json.dump(status, open(STATUS_FILE, 'w'), indent=2)
 
-def run_pipeline(profile_name="light"):
+def run_pipeline(profile_name="light", resume_from=None):
     os.makedirs(LOG_DIR, exist_ok=True)
     profile = load_profile(profile_name)
-    status = {name: {"state": "pending", "description": desc} for name, desc, _, _ in STAGES}
+    
+    if resume_from and os.path.exists(STATUS_FILE):
+        status = json.load(open(STATUS_FILE))
+    else:
+        status = {name: {"state": "pending", "description": desc} for name, desc, _, _ in STAGES}
+        
     status["overall"] = "running"
     write_status(status)
     write_conf_ini(profile)
 
-    for name, desc, cmd, cwd in STAGES:
+    start_idx = 0
+    if resume_from:
+        for i, (name, _, _, _) in enumerate(STAGES):
+            if name == resume_from:
+                start_idx = i
+                break
+
+    for name, desc, cmd, cwd in STAGES[start_idx:]:
         status[name]["state"] = "running"
         status[name]["started_at"] = time.time()
         write_status(status)
@@ -82,12 +98,24 @@ def run_pipeline(profile_name="light"):
             continue
 
         log_path = os.path.join(LOG_DIR, f"{name}.log")
+        print(f"--- Starting stage: {name} ---")
         with open(log_path, "w") as logf:
-            result = subprocess.run(cmd, cwd=cwd, stdout=logf, stderr=subprocess.STDOUT, env=os.environ.copy())
+            process = subprocess.Popen(
+                cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                env=os.environ.copy(), text=True, bufsize=1
+            )
+            for line in process.stdout:
+                import sys
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                logf.write(line)
+                logf.flush()
+            process.wait()
+            result_returncode = process.returncode
 
         duration = round(time.time() - status[name]["started_at"], 1)
 
-        if result.returncode != 0:
+        if result_returncode != 0:
             status[name]["state"] = "failed"
             status[name]["duration"] = duration
             status["overall"] = "failed"
@@ -104,5 +132,6 @@ def run_pipeline(profile_name="light"):
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--profile", default="light")
+    p.add_argument("--resume-from", help="Stage to resume pipeline execution from")
     args = p.parse_args()
-    run_pipeline(args.profile)
+    run_pipeline(args.profile, args.resume_from)

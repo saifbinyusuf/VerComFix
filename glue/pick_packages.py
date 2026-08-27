@@ -1,9 +1,9 @@
 import re, glob, os, time, urllib.request, json
 
-VENDOR = os.path.join(os.path.dirname(__file__), '..', 'vendor', 'VerComFix')
-REPO_GLOB = os.path.join(VENDOR, 'data', 'repos', '*')
-RANK_TXT = os.path.join(VENDOR, 'data_collection', 'rank.txt')
-OUT_FILE = os.path.join(VENDOR, 'data_collection', 'src', 'rank.txt')
+BASE = os.path.join(os.path.dirname(__file__), '..')
+REPO_GLOB = os.path.join(BASE, 'data', 'repos', '*')
+RANK_TXT = os.path.join(BASE, 'data_collection', 'rank.txt')
+OUT_FILE = os.path.join(BASE, 'data_collection', 'src', 'rank.txt')
 KNOWN_BREAKING = {'scikit-learn', 'numpy'}
 BUDGET_BYTES = int(os.environ.get('PACKAGE_BUDGET_MB', '150')) * 1_000_000
 

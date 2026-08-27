@@ -1,6 +1,6 @@
 import zipfile, shutil, glob, os
 
-REPOS_DIR = os.path.join(os.path.dirname(__file__), '..', 'vendor', 'VerComFix', 'data', 'repos')
+REPOS_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'repos')
 
 def main():
     for zpath in glob.glob(os.path.join(REPOS_DIR, '*.zip')):
