@@ -1,0 +1,11 @@
+# orchestrator/profiles/light.yaml
+repo:
+  min_stars: 500
+  min_forks: 50
+  min_dependencies: 5
+  date_start: "2025-01-01"
+  date_end: "2025-03-31"
+  max_repo_count: 8
+  max_repo_size_kb: 5000
+packages:
+  budget_mb: 150

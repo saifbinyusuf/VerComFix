@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VerComFix Pipeline</title>
+    <meta name="description" content="VerComFix — automated pipeline for version-compatible code repair task construction">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-deep: #0a0e1a;
+            --bg-card: rgba(15, 23, 42, 0.65);
+            --bg-card-hover: rgba(20, 30, 55, 0.8);
+            --border: rgba(99, 130, 190, 0.15);
+            --border-active: rgba(99, 180, 255, 0.35);
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.25);
+            --success: #22c55e;
+            --success-glow: rgba(34, 197, 94, 0.2);
+            --warning: #f59e0b;
+            --warning-glow: rgba(245, 158, 11, 0.2);
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.2);
+            --glass-blur: 16px;
+            --radius: 14px;
+            --radius-sm: 8px;
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated gradient background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 20% 50%, rgba(59,130,246,0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 20%, rgba(139,92,246,0.06) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 80%, rgba(6,182,212,0.05) 0%, transparent 50%);
+            animation: bgShift 20s ease-in-out infinite alternate;
+            z-index: -1;
+        }
+        @keyframes bgShift {
+            0%   { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(-5%, 3%) rotate(3deg); }
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 32px 24px 60px;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 36px;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .logo-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 0 24px var(--accent-glow);
+        }
+        .logo h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .logo h1 span { color: var(--accent); }
+        .logo p {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .controls select {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 9px 14px;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 13px;
+            backdrop-filter: blur(var(--glass-blur));
+            cursor: pointer;
+            outline: none;
+            transition: var(--transition);
+        }
+        .controls select:hover { border-color: var(--border-active); }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 20px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
+            pointer-events: none;
+        }
+        .btn-start {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            box-shadow: 0 2px 12px var(--accent-glow);
+        }
+        .btn-start:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+        .btn-stop {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            backdrop-filter: blur(var(--glass-blur));
+        }
+        .btn-stop:hover {
+            border-color: rgba(239, 68, 68, 0.4);
+            color: var(--danger);
+        }
+        .btn:active { transform: scale(0.97); }
+
+        /* Overall status banner */
+        .status-banner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 20px;
+            border-radius: var(--radius);
+            margin-bottom: 24px;
+            font-size: 13px;
+            font-weight: 500;
+            backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+        .status-banner.idle       { background: var(--bg-card); color: var(--text-muted); }
+        .status-banner.running    { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.25); color: var(--accent); }
+        .status-banner.complete   { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25); color: var(--success); }
+        .status-banner.failed     { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); color: var(--danger); }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+        .status-banner.running .status-dot {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: 0.4; transform: scale(0.8); }
+        }
+
+        /* Section headers */
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--text-muted);
+            margin: 28px 0 12px;
+        }
+
+        /* Stage cards */
+        .stage-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+            backdrop-filter: blur(var(--glass-blur));
+            transition: var(--transition);
+            overflow: hidden;
+        }
+        .stage-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-active);
+        }
+        .stage-card.active {
+            border-color: var(--border-active);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+        .stage-card.done    { border-left: 3px solid var(--success); }
+        .stage-card.failed  { border-left: 3px solid var(--danger); }
+        .stage-card.running { border-left: 3px solid var(--accent); }
+
+        .stage-header {
+            display: flex;
+            align-items: center;
+            padding: 14px 18px;
+            cursor: pointer;
+            user-select: none;
+            gap: 14px;
+        }
+
+        .stage-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+            transition: var(--transition);
+        }
+        .stage-card.pending .stage-icon  { background: rgba(100,116,139,0.15); color: var(--text-muted); }
+        .stage-card.running .stage-icon  { background: rgba(59,130,246,0.15); color: var(--accent); }
+        .stage-card.done .stage-icon     { background: rgba(34,197,94,0.15); color: var(--success); }
+        .stage-card.failed .stage-icon   { background: rgba(239,68,68,0.15); color: var(--danger); }
+        .stage-card.stopped .stage-icon  { background: rgba(245,158,11,0.15); color: var(--warning); }
+
+        .stage-info { flex: 1; min-width: 0; }
+        .stage-name {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .stage-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .stage-progress-label {
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent);
+            margin-top: 3px;
+            min-height: 16px;
+            transition: var(--transition);
+        }
+        .stage-card.done .stage-progress-label { color: var(--success); }
+        .stage-card.failed .stage-progress-label { color: var(--danger); }
+
+        .stage-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+        .stage-duration {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+        .stage-chevron {
+            transition: transform 0.2s ease;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        .stage-card.expanded .stage-chevron { transform: rotate(180deg); }
+
+        /* Progress bar */
+        .stage-progress {
+            height: 3px;
+            background: rgba(100,116,139,0.1);
+            position: relative;
+            overflow: hidden;
+            margin: 0 18px;
+            border-radius: 2px;
+        }
+        .stage-progress-fill {
+            height: 100%;
+            transition: width 0.5s ease;
+            position: absolute;
+            left: 0;
+            top: 0;
+            border-radius: 2px;
+        }
+        .stage-card.pending .stage-progress-fill  { width: 0%; }
+        .stage-card.done .stage-progress-fill     { width: 100%; background: var(--success); }
+        .stage-card.failed .stage-progress-fill   { width: 100%; background: var(--danger); }
+        /* Indeterminate shimmer — used when no total is known */
+        .stage-progress-fill.indeterminate {
+            width: 100%;
+            background: linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%);
+            animation: shimmer 1.5s ease-in-out infinite;
+        }
+        /* Determinate fill — real percentage */
+        .stage-progress-fill.determinate {
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent-glow);
+        }
+        @keyframes shimmer {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Log panel */
+        .stage-log {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .stage-card.expanded .stage-log { max-height: 350px; }
+        .stage-log-inner {
+            padding: 0 18px 14px;
+        }
+        .stage-log pre {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(100,116,139,0.1);
+            border-radius: var(--radius-sm);
+            padding: 12px 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            max-height: 280px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .stage-log pre::-webkit-scrollbar { width: 6px; }
+        .stage-log pre::-webkit-scrollbar-track { background: transparent; }
+        .stage-log pre::-webkit-scrollbar-thumb {
+            background: rgba(100,116,139,0.3);
+            border-radius: 3px;
+        }
+
+        /* Spinner */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid rgba(59,130,246,0.2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Results panel */
+        .results-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            backdrop-filter: blur(var(--glass-blur));
+            overflow: hidden;
+        }
+        .results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .results-header h3 {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .results-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(34,197,94,0.1);
+            color: var(--success);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .results-empty {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .results-table th {
+            text-align: left;
+            padding: 10px 16px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            background: rgba(0,0,0,0.15);
+        }
+        .results-table td {
+            padding: 10px 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid rgba(100,116,139,0.06);
+            font-family: 'JetBrains Mono', monospace;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .results-table tr:hover td { background: rgba(59,130,246,0.03); }
+        .results-actions {
+            display: flex;
+            gap: 8px;
+            padding: 14px 20px;
+            border-top: 1px solid var(--border);
+        }
+        .btn-download {
+            background: rgba(34,197,94,0.1);
+            border: 1px solid rgba(34,197,94,0.2);
+            color: var(--success);
+            padding: 7px 14px;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+        }
+        .btn-download:hover {
+            background: rgba(34,197,94,0.18);
+            border-color: rgba(34,197,94,0.35);
+        }
+
+        /* Fade in animation */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .stage-card { animation: fadeUp 0.4s ease both; }
+        .stage-card:nth-child(1)  { animation-delay: 0.02s; }
+        .stage-card:nth-child(2)  { animation-delay: 0.04s; }
+        .stage-card:nth-child(3)  { animation-delay: 0.06s; }
+        .stage-card:nth-child(4)  { animation-delay: 0.08s; }
+        .stage-card:nth-child(5)  { animation-delay: 0.10s; }
+        .stage-card:nth-child(6)  { animation-delay: 0.12s; }
+        .stage-card:nth-child(7)  { animation-delay: 0.14s; }
+        .stage-card:nth-child(8)  { animation-delay: 0.16s; }
+        .stage-card:nth-child(9)  { animation-delay: 0.18s; }
+        .stage-card:nth-child(10) { animation-delay: 0.20s; }
+        .stage-card:nth-child(11) { animation-delay: 0.22s; }
+        .stage-card:nth-child(12) { animation-delay: 0.24s; }
+        .stage-card:nth-child(13) { animation-delay: 0.26s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <div>
+                    <h1>Ver<span>Com</span>Fix</h1>
+                    <p>Pipeline Dashboard</p>
+                </div>
+            </div>
+            <div class="controls">
+                <select id="profileSelect">
+                    <option value="light">Light Profile</option>
+                    <option value="full">Full Profile</option>
+                </select>
+                <button class="btn btn-start" onclick="startPipeline()" id="btnStart">
+                    <span>▶</span> Start
+                </button>
+                <button class="btn btn-stop" onclick="stopPipeline()" id="btnStop">
+                    <span>■</span> Stop
+                </button>
+            </div>
+        </header>
+
+        <!-- Status Banner -->
+        <div class="status-banner idle" id="statusBanner">
+            <div class="status-dot"></div>
+            <span id="statusText">Pipeline idle — press Start to begin</span>
+        </div>
+
+        <!-- Stages -->
+        <div class="section-title">Pipeline Stages</div>
+        <div id="stagesContainer"></div>
+
+        <!-- Results -->
+        <div class="section-title" style="margin-top: 32px;">Results</div>
+        <div class="results-panel" id="resultsPanel">
+            <div class="results-header">
+                <h3>Generated Tasks</h3>
+                <div class="results-count" id="resultsCount" style="display:none;">
+                    <span>●</span> <span id="taskCount">0</span> tasks
+                </div>
+            </div>
+            <div id="resultsBody">
+                <div class="results-empty">No tasks generated yet. Run the pipeline to construct tasks.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STAGE_ORDER = [
+            { id: "select_repos",   desc: "Select GitHub repos" },
+            { id: "cap_repos",      desc: "Cap repo list" },
+            { id: "download_repos", desc: "Download repos" },
+            { id: "unzip_repos",    desc: "Extract repo archives" },
+            { id: "pick_packages",  desc: "Pick packages to crawl" },
+            { id: "crawl_pypi",     desc: "Crawl PyPI packages" },
+            { id: "uncompress",     desc: "Uncompress packages" },
+            { id: "kb_init",        desc: "Init knowledge DB" },
+            { id: "kb_top_level",   desc: "Index top-level modules" },
+            { id: "kb_sniff",       desc: "Sniff API signatures" },
+            { id: "tc_init",        desc: "Init task construction DB" },
+            { id: "tc_extract",     desc: "Extract tasks from repos" },
+            { id: "select_tasks",   desc: "Select final tasks" },
+        ];
+
+        let expandedStage = null;
+        let lastStatus = {};
+
+        // Icons for each state
+        function stateIcon(state) {
+            if (state === 'running') return '<div class="spinner"></div>';
+            if (state === 'done')    return '✓';
+            if (state === 'failed')  return '✗';
+            if (state === 'stopped') return '■';
+            return '○';
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds && seconds !== 0) return '';
+            if (seconds < 60)  return `${Math.round(seconds)}s`;
+            if (seconds < 3600) return `${Math.floor(seconds/60)}m ${Math.round(seconds%60)}s`;
+            return `${Math.floor(seconds/3600)}h ${Math.floor((seconds%3600)/60)}m`;
+        }
+
+        // Build stage cards once
+        function buildStages() {
+            const container = document.getElementById('stagesContainer');
+            container.innerHTML = '';
+            for (const stage of STAGE_ORDER) {
+                const card = document.createElement('div');
+                card.className = 'stage-card pending';
+                card.id = `card-${stage.id}`;
+                card.innerHTML = `
+                    <div class="stage-header" onclick="toggleStage('${stage.id}')">
+                        <div class="stage-icon">${stateIcon('pending')}</div>
+                        <div class="stage-info">
+                            <div class="stage-name">${stage.id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+                            <div class="stage-desc">${stage.desc}</div>
+                            <div class="stage-progress-label" id="plabel-${stage.id}"></div>
+                        </div>
+                        <div class="stage-meta">
+                            <span class="stage-duration" id="dur-${stage.id}"></span>
+                            <span class="stage-chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="stage-progress"><div class="stage-progress-fill" id="pfill-${stage.id}"></div></div>
+                    <div class="stage-log">
+                        <div class="stage-log-inner">
+                            <pre id="log-${stage.id}">No output yet.</pre>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        function toggleStage(stageId) {
+            const card = document.getElementById(`card-${stageId}`);
+            if (expandedStage === stageId) {
+                card.classList.remove('expanded');
+                expandedStage = null;
+            } else {
+                if (expandedStage) {
+                    document.getElementById(`card-${expandedStage}`)?.classList.remove('expanded');
+                }
+                card.classList.add('expanded');
+                expandedStage = stageId;
+                fetchLog(stageId);
+            }
+        }
+
+        // Update banner
+        function updateBanner(overall) {
+            const banner = document.getElementById('statusBanner');
+            const text = document.getElementById('statusText');
+            banner.className = 'status-banner';
+            if (!overall || overall === 'not_started') {
+                banner.classList.add('idle');
+                text.textContent = 'Pipeline idle — press Start to begin';
+            } else if (overall === 'running') {
+                banner.classList.add('running');
+                text.textContent = 'Pipeline is running…';
+            } else if (overall === 'complete') {
+                banner.classList.add('complete');
+                text.textContent = 'Pipeline completed successfully';
+            } else if (overall === 'failed') {
+                banner.classList.add('failed');
+                text.textContent = 'Pipeline failed — expand the failed stage for details';
+            } else if (overall === 'stopped') {
+                banner.classList.add('idle');
+                text.textContent = 'Pipeline was stopped.';
+            }
+        }
+
+        // Update stage cards from status
+        function updateStages(status) {
+            for (const stage of STAGE_ORDER) {
+                const s = status[stage.id] || { state: 'pending' };
+                const card = document.getElementById(`card-${stage.id}`);
+                if (!card) continue;
+
+                // Update state class
+                card.className = card.className.replace(/\b(pending|running|done|failed)\b/g, '').trim();
+                card.classList.add(s.state || 'pending');
+                if (expandedStage === stage.id) card.classList.add('expanded');
+
+                // Update icon
+                const icon = card.querySelector('.stage-icon');
+                icon.innerHTML = stateIcon(s.state);
+
+                // Update duration
+                const durEl = document.getElementById(`dur-${stage.id}`);
+                if (s.duration !== undefined) {
+                    durEl.textContent = formatDuration(s.duration);
+                } else if (s.state === 'running' && s.started_at) {
+                    const elapsed = (Date.now()/1000) - s.started_at;
+                    durEl.textContent = formatDuration(elapsed);
+                } else {
+                    durEl.textContent = '';
+                }
+
+                // Update detail/description
+                const descEl = card.querySelector('.stage-desc');
+                if (s.detail) {
+                    descEl.textContent = `${stage.desc} — ${s.detail}`;
+                } else {
+                    descEl.textContent = stage.desc;
+                }
+
+                // Update progress bar and label
+                const pfill = document.getElementById(`pfill-${stage.id}`);
+                const plabel = document.getElementById(`plabel-${stage.id}`);
+                if (s.progress && (s.state === 'running' || s.state === 'done')) {
+                    const p = s.progress;
+                    plabel.textContent = p.label || '';
+                    if (p.total && p.total > 0) {
+                        // Determinate progress
+                        const pct = Math.min(100, Math.round((p.current / p.total) * 100));
+                        pfill.className = 'stage-progress-fill determinate';
+                        pfill.style.width = pct + '%';
+                    } else if (s.state === 'running') {
+                        // Indeterminate — we have a count but no total
+                        pfill.className = 'stage-progress-fill indeterminate';
+                        pfill.style.width = '';
+                    }
+                } else if (s.state === 'running') {
+                    pfill.className = 'stage-progress-fill indeterminate';
+                    pfill.style.width = '';
+                    plabel.textContent = '';
+                } else if (s.state === 'done') {
+                    pfill.className = 'stage-progress-fill';
+                    pfill.style.width = '100%';
+                } else if (s.state === 'failed') {
+                    pfill.className = 'stage-progress-fill';
+                    pfill.style.width = '100%';
+                } else {
+                    pfill.className = 'stage-progress-fill';
+                    pfill.style.width = '0%';
+                    plabel.textContent = '';
+                }
+
+                // Auto-expand running stage
+                if (s.state === 'running' && expandedStage !== stage.id) {
+                    if (expandedStage) {
+                        document.getElementById(`card-${expandedStage}`)?.classList.remove('expanded');
+                    }
+                    card.classList.add('expanded');
+                    expandedStage = stage.id;
+                }
+            }
+        }
+
+        async function fetchLog(stageId) {
+            try {
+                const resp = await fetch(`/log/${stageId}`);
+                const data = await resp.json();
+                const pre = document.getElementById(`log-${stageId}`);
+                if (data.lines.length > 0) {
+                    pre.textContent = data.lines.join('');
+                    pre.scrollTop = pre.scrollHeight;
+                } else {
+                    pre.textContent = 'No output yet.';
+                }
+            } catch(e) {}
+        }
+
+        async function updateResults() {
+            try {
+                const resp = await fetch('/results');
+                const data = await resp.json();
+                const countEl = document.getElementById('resultsCount');
+                const taskCountEl = document.getElementById('taskCount');
+                const body = document.getElementById('resultsBody');
+
+                if (data.tasks_file_exists && data.tasks_count > 0) {
+                    countEl.style.display = 'inline-flex';
+                    taskCountEl.textContent = data.tasks_count;
+
+                    // Fetch preview
+                    const previewResp = await fetch('/results/preview?n=8');
+                    const previewData = await previewResp.json();
+                    if (previewData.tasks.length > 0) {
+                        const keys = Object.keys(previewData.tasks[0]).slice(0, 5);
+                        let html = '<table class="results-table"><thead><tr>';
+                        keys.forEach(k => html += `<th>${k}</th>`);
+                        html += '</tr></thead><tbody>';
+                        previewData.tasks.forEach(t => {
+                            html += '<tr>';
+                            keys.forEach(k => {
+                                const v = typeof t[k] === 'object' ? JSON.stringify(t[k]) : (t[k] ?? '');
+                                html += `<td title="${String(v).replace(/"/g, '&quot;')}">${v}</td>`;
+                            });
+                            html += '</tr>';
+                        });
+                        html += '</tbody></table>';
+                        html += '<div class="results-actions"><a href="/results/download" class="btn-download">⬇ Download tasks.jsonl</a></div>';
+                        body.innerHTML = html;
+                    }
+                } else {
+                    countEl.style.display = 'none';
+                    body.innerHTML = '<div class="results-empty">No tasks generated yet. Run the pipeline to construct tasks.</div>';
+                }
+            } catch(e) {}
+        }
+
+        // Polling
+        async function poll() {
+            try {
+                const resp = await fetch('/status');
+                const status = await resp.json();
+                lastStatus = status;
+                updateBanner(status.overall);
+                updateStages(status);
+
+                // Refresh log of expanded stage
+                if (expandedStage) {
+                    fetchLog(expandedStage);
+                }
+
+                updateResults();
+            } catch(e) {
+                updateBanner('not_started');
+            }
+        }
+
+        async function startPipeline() {
+            const profile = document.getElementById('profileSelect').value;
+            try {
+                const resp = await fetch(`/start?profile=${profile}`, { method: 'POST' });
+                const data = await resp.json();
+                if (data.error) {
+                    alert(data.error);
+                }
+            } catch(e) {
+                alert('Failed to connect to server');
+            }
+            poll();
+        }
+
+        async function stopPipeline() {
+            try { await fetch('/stop', { method: 'POST' }); } catch(e) {}
+            poll();
+        }
+
+        // Init
+        buildStages();
+        poll();
+        setInterval(poll, 1500);
+    </script>
+</body>
+</html>
