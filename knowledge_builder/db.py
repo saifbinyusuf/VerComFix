@@ -48,7 +48,7 @@ def init_db():
                         package_version VARCHAR(255) NOT NULL,
                         api_name VARCHAR(1024) NOT NULL,
                         parameters TEXT,
-                        has_return TINYINT(1) NOT NULL,
+                        has_return VARCHAR(255) NOT NULL,
                         UNIQUE KEY uniq_api (package_name(100), package_version(100), api_name(191))
                     )
                 """)
@@ -61,7 +61,7 @@ def init_db():
                         version_id INT NOT NULL,
                         api_name TEXT NOT NULL,
                         param_list TEXT,
-                        has_return BOOLEAN,
+                        has_return VARCHAR(255),
                         diff CHAR(1) NOT NULL,
                         FOREIGN KEY (package_version) REFERENCES top_level(id) ON DELETE CASCADE
                     )
@@ -105,10 +105,10 @@ def save_api_signatures(package_name: str, version: str, signatures: List[Tuple[
             for api_name, params, has_return in signatures:
                 try:
                     cursor.execute(
-                        """INSERT INTO api_signatures 
+                        """REPLACE INTO api_signatures 
                         (package_name, package_version, api_name, parameters, has_return)
                         VALUES (%s, %s, %s, %s, %s)""",
-                        (package_name, version, api_name, json.dumps(params), 1 if has_return else 0)
+                        (package_name, version, api_name, json.dumps(params), str(has_return))
                     )
                 except pymysql.IntegrityError:
                     continue
@@ -136,7 +136,7 @@ def get_api_signatures(package_name: str, version: str = None):
             results = []
             for api_name, params_json, has_return in cursor.fetchall():
                 params = json.loads(params_json) if params_json else []
-                results.append((api_name, params, bool(has_return)))
+                results.append((api_name, params, has_return))
             return results
 
 

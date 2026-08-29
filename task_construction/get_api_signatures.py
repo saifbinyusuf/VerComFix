@@ -76,13 +76,14 @@ def get_API_calls(code, file_path, package_version_dict):
         for name, param, lineno, end_lineno in func_calls_raw:
             name_parts = name.split('.')
             
-            # Case 1: Method call on known instance (e.g., y = linear(x))
             if len(name_parts) == 1 and name in instance2class:
-                resolved_name = instance2class[name] + '.' + name
+                resolved_name = instance2class[name] + '.__call__'
                 new_func_calls.append((resolved_name, param, lineno, end_lineno))
-            # Case 2: Direct API call through variable (original functionality)
-            elif name_parts[0] in class2obj and len(name_parts) == 2:
-                resolved_name = class2obj[name_parts[0]] + '.' + name_parts[1]
+            elif name_parts[0] in class2obj and len(name_parts) >= 2:
+                resolved_name = class2obj[name_parts[0]] + '.' + '.'.join(name_parts[1:])
+                new_func_calls.append((resolved_name, param, lineno, end_lineno))
+            elif name_parts[0] in instance2class and len(name_parts) >= 2:
+                resolved_name = instance2class[name_parts[0]] + '.' + '.'.join(name_parts[1:])
                 new_func_calls.append((resolved_name, param, lineno, end_lineno))
             else:
                 new_func_calls.append((name, param, lineno, end_lineno))
@@ -144,13 +145,14 @@ def get_API_calls_from_funcnode(func_code, full_code, file_path, package_version
         for name, param, lineno, end_lineno in func_calls_raw:
             name_parts = name.split('.')
             
-            # Case 1: Method call on known instance (e.g., y = linear(x))
             if len(name_parts) == 1 and name in instance2class:
-                resolved_name = instance2class[name] + '.' + name
+                resolved_name = instance2class[name] + '.__call__'
                 new_func_calls.append((resolved_name, param, lineno, end_lineno))
-            # Case 2: Direct API call through variable (original functionality)
-            elif name_parts[0] in class2obj and len(name_parts) == 2:
-                resolved_name = class2obj[name_parts[0]] + '.' + name_parts[1]
+            elif name_parts[0] in class2obj and len(name_parts) >= 2:
+                resolved_name = class2obj[name_parts[0]] + '.' + '.'.join(name_parts[1:])
+                new_func_calls.append((resolved_name, param, lineno, end_lineno))
+            elif name_parts[0] in instance2class and len(name_parts) >= 2:
+                resolved_name = instance2class[name_parts[0]] + '.' + '.'.join(name_parts[1:])
                 new_func_calls.append((resolved_name, param, lineno, end_lineno))
             else:
                 new_func_calls.append((name, param, lineno, end_lineno))

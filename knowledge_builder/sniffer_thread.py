@@ -10,12 +10,28 @@ import concurrent.futures
 def get_keywords(node):
     args = node.args
     arg_names = []
-    defaults = args.defaults
-    for arg in args.args:
-        arg_names += [arg.arg]
-    has_return = any(isinstance(n, ast.Return) for n in ast.walk(node))
-    # return (arg_names, len(defaults))
-    return (arg_names, int(has_return))
+    
+    if hasattr(args, 'posonlyargs'):
+        arg_names.extend([arg.arg for arg in args.posonlyargs])
+        
+    arg_names.extend([arg.arg for arg in args.args])
+    
+    if args.vararg:
+        arg_names.append('*' + args.vararg.arg)
+        
+    arg_names.extend([arg.arg for arg in args.kwonlyargs])
+    
+    if args.kwarg:
+        arg_names.append('**' + args.kwarg.arg)
+        
+    if hasattr(node, 'returns') and node.returns is not None:
+        try:
+            return_val = ast.unparse(node.returns)
+        except Exception:
+            return_val = '1'
+    else:
+        return_val = '1' if any(isinstance(n, ast.Return) for n in ast.walk(node)) else '0'
+    return (arg_names, return_val)
 
 class ClassVisitor(ast.NodeVisitor):
     def __init__(self):
@@ -456,10 +472,10 @@ def process_package(lib_name, root_dir="../packages"):
                 continue
 
             for api_full_str in API_name_lst:
-                parts = api_full_str.split(",")
+                parts = api_full_str.split(",", 2)
                 api_qualname = parts[0]
                 params = parts[1].split(";") if parts[1] else []
-                has_return = int(parts[2])
+                has_return = parts[2]
                 version_api_list.append([api_qualname, params, has_return])
 
         save_api_signatures(lib_name, version, version_api_list)

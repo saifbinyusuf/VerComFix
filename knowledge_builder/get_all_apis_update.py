@@ -134,11 +134,16 @@ def extract_parameters(node):
 
 
 def has_return_value(node):
-    """Check if the function has any return statements with values"""
+    """Extract Python return type hint if present, else fallback to '1'/'0'"""
+    if hasattr(node, 'returns') and node.returns is not None:
+        try:
+            return ast.unparse(node.returns)
+        except Exception:
+            return '1'
     for item in ast.walk(node):
         if isinstance(item, ast.Return) and item.value is not None:
-            return True
-    return False
+            return '1'
+    return '0'
 
 
 def get_all_apis_from_source(module_py, source_path, export_map=None):
